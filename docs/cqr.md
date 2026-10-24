@@ -84,4 +84,93 @@ A test asserts that no calibration row's outturn ends later than the decision ti
 
 ## Results
 
-_Not yet run._
+Run on 25 Oct 2026 with `python analysis/cqr.py` (about 2.5 minutes). Leakage tests are in `analysis/tests/test_cqr.py`. The script also asserts, for every calibration window, that each outturn was known at the decision time and that each prediction came from a model trained before its own decision month.
+
+- Every development and October day had a full 28-day window of 672 calibration hours, so no day went unadjusted.
+- The LightGBM-raw rows reproduce `docs/ml-challenger.md` exactly (development MAE 1,183 MW, coverage 55%; October MAE 1,383 MW, coverage 49%).
+
+### Verdict: promising, unconfirmed (needs Nov 2026+ data)
+
+- **Condition 1, coverage within 75–85% in at least 8 of 11 development months:** met, **8 of 11**, the bare minimum.
+  - Outside the band: December (87.1%), May (86.8%) and September (72.8%).
+  - Two of the eight are on the edge: April is exactly 85.0% (612 of 720 hours; the bound is inclusive) and June is 75.3%. One more April hour inside the range would have failed the rule.
+- **Condition 2, pooled pinball loss below the current method's:** met, 369 vs 420 MW.
+
+So the rule says "promising, unconfirmed". The margin on coverage is thin. The pinball and MAE gains are clearer: the day-block intervals below exclude zero.
+
+### Development, Nov 2025 – Sep 2026 (decides the verdict)
+
+| decision month | hours | coverage current | coverage LightGBM raw | coverage LightGBM + CQR | pinball current | pinball LightGBM raw | pinball LightGBM + CQR |
+|---|---|---|---|---|---|---|---|
+| 2025-11 | 480 | 70% | 38% | 80% | 559 | 606 | 436 |
+| 2025-12 | 744 | 71% | 53% | 87% | 579 | 443 | 419 |
+| 2026-01 | 744 | 69% | 54% | 77% | 541 | 439 | 424 |
+| 2026-02 | 672 | 64% | 57% | 78% | 427 | 417 | 383 |
+| 2026-03 | 743 | 73% | 48% | 80% | 368 | 425 | 387 |
+| 2026-04 | 720 | 73% | 54% | 85% | 385 | 379 | 367 |
+| 2026-05 | 744 | 68% | 62% | 87% | 342 | 299 | 288 |
+| 2026-06 | 720 | 78% | 59% | 75% | 341 | 358 | 339 |
+| 2026-07 | 744 | 75% | 66% | 81% | 330 | 319 | 328 |
+| 2026-08 | 744 | 74% | 59% | 79% | 325 | 304 | 299 |
+| 2026-09 | 720 | 63% | 52% | 73% | 468 | 457 | 419 |
+| all | 7775 | 71% | 55% | 80% | 420 | 397 | 369 |
+
+Pooled, all metrics (MW unless stated):
+
+| method | coverage | mean width | pinball | MAE | P50 hit (target 50%) | P70 hit (target 70%) | P80 hit (target 80%) | P90 hit (target 90%) | P95 hit (target 95%) |
+|---|---|---|---|---|---|---|---|---|---|
+| current | 71% | 3,557 | 420 | 1,272 | 50% | 67% | 76% | 84% | 89% |
+| LightGBM raw | 55% | 2,290 | 397 | 1,183 | 53% | 65% | 72% | 81% | 86% |
+| LightGBM + CQR | 80% | 3,713 | 369 | 1,172 | 49% | 69% | 79% | 89% | 94% |
+
+Cost backtest, short £100 / long £30 per MWh (£m, GB-wide volume):
+
+| method | P50 | P70 | P80 | P90 | P95 |
+|---|---|---|---|---|---|
+| current | 649.0 | 531.0 | 524.5 | 562.1 | 612.9 |
+| LightGBM raw | 575.9 | 487.0 | 459.7 | 457.3 | 480.5 |
+| LightGBM + CQR | 621.8 | 479.0 | 462.2 | 503.9 | 578.3 |
+
+Day-block bootstrap, 95%: CQR − current pinball -50 MW [-79, -24]; CQR − current MAE -100 MW [-182, -22]; CQR coverage 80% [78%, 83%].
+
+### October 2026: already seen in the LightGBM study, not a clean holdout
+
+Pooled, all metrics (MW unless stated):
+
+| method | coverage | mean width | pinball | MAE | P50 hit (target 50%) | P70 hit (target 70%) | P80 hit (target 80%) | P90 hit (target 90%) | P95 hit (target 95%) |
+|---|---|---|---|---|---|---|---|---|---|
+| current | 72% | 4,780 | 538 | 1,533 | 58% | 74% | 83% | 89% | 92% |
+| LightGBM raw | 49% | 2,597 | 476 | 1,383 | 53% | 64% | 73% | 80% | 84% |
+| LightGBM + CQR | 83% | 4,632 | 450 | 1,457 | 57% | 79% | 86% | 94% | 96% |
+
+Cost backtest, short £100 / long £30 per MWh (£m, GB-wide volume):
+
+| method | P50 | P70 | P80 | P90 | P95 |
+|---|---|---|---|---|---|
+| current | 45.0 | 38.8 | 41.1 | 51.4 | 56.5 |
+| LightGBM raw | 44.7 | 39.7 | 38.3 | 38.4 | 39.0 |
+| LightGBM + CQR | 43.0 | 38.5 | 41.4 | 47.5 | 55.1 |
+
+Day-block bootstrap, 95%: CQR − current pinball -89 MW [-180, -3]; CQR − current MAE -76 MW [-364, +212]; CQR coverage 83% [73%, 92%].
+
+### What it shows
+
+- **CQR fixes the challenger's main flaw.** The 80% range goes from 55% to 80% coverage pooled (bootstrap 78–83%), at a mean width (3,713 MW) close to the current method's (3,557 MW).
+- **It is better than the current method on both scores.** Pooled development pinball loss −50 MW [−79, −24] and MAE −100 MW [−182, −22], with the planning-volume hit rates within 1 point of target at every level.
+- **Monthly coverage still swings,** from 73% to 87%. A 28-day window adapts, but not instantly.
+- **Costs:**
+  - At £100/£30, CQR's P70 and P80 cost less than the current method's (£479m and £462m vs £531m and £525m). Its P90 and P95 also cost less, but more than the raw challenger's, which is the honest price of actually meeting those levels.
+  - The raw challenger's low tail costs mean little, because its P90 and P95 are met only 81% and 86% of the time.
+  - All £ figures are GB-wide volumes at illustrative costs.
+- **October, already seen and not a clean holdout:**
+  - coverage 83%, pinball −89 MW [−180, −3];
+  - MAE −76 MW, with an interval spanning zero.
+
+  This is consistent with development, but it is not independent evidence.
+
+### Data
+
+No new data was used: Nov 2025 – Sep 2026 and October 2026 had all been seen before (`docs/data-usage.md`). A real test needs a new pre-registered rule and decision months from November 2026 onwards, for example:
+- LightGBM + CQR against the current method;
+- coverage 75–85% and lower pinball loss;
+- on at least three months.
