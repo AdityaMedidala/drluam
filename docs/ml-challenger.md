@@ -74,4 +74,93 @@ Otherwise it is **not adoption-worthy**. Either way the verdict is recorded here
 
 ## Results
 
-_Not yet run._
+Run on 24 Oct 2026 with `python analysis/ml_challenger.py dev`, then `python analysis/ml_challenger.py october` once. The October output is kept in `analysis/ml-challenger-october.json`. The October data was fetched at 18:18:32 UTC (`analysis/data-2026-10/manifest.json`), after the rule commit `80d3858` at 18:17:06 UTC. The leakage tests are in `analysis/tests/test_ml_challenger.py` (`python -m pytest analysis/tests`).
+
+**One implementation note.** The models use LightGBM's native `lgb.train` with exactly the pre-registered parameters, not the scikit-learn wrapper the parameter names come from. The wrapper needs scikit-learn installed and would have added a dependency for nothing. Nothing else differs from the rule.
+
+### Verdict on October 2026: NOT ADOPTION-WORTHY
+
+Decisions 1–22 Oct 2026, delivery days 2–23 Oct (22 days, 528 hours). Model trained once on 15,311 hours delivered 1 Jan 2025 – 30 Sep 2026.
+
+| condition | current method | challenger | ML − current, day-block 95% interval | holds? |
+|---|---|---|---|---|
+| 1. MAE (P50) lower | 1,533 MW | 1,383 MW | −150 MW [−460, +145] | yes |
+| 2. pinball loss lower | 538 MW | 476 MW | −62 MW [−151, +25] | yes |
+| 3. P10–P90 coverage within 75–85% | 72% | **49%** | – | **no** |
+
+The challenger's middle and average quantiles are better, but both bootstrap intervals include zero over 22 days. Its 80% range is far too narrow: the outturn fell inside it in under half the hours. Under the rule that makes it not adoption-worthy, and nothing changes in the app.
+
+### Development results (rolling, monthly retrain)
+
+| decision month | hours | MAE current | MAE ML | pinball current | pinball ML | coverage current | coverage ML |
+|---|---|---|---|---|---|---|---|
+| 2025-11 | 480 | 1,689 | 1,756 | 559 | 606 | 70% | 38% |
+| 2025-12 | 744 | 1,778 | 1,299 | 579 | 443 | 71% | 53% |
+| 2026-01 | 744 | 1,532 | 1,308 | 541 | 439 | 69% | 54% |
+| 2026-02 | 672 | 1,279 | 1,208 | 427 | 417 | 64% | 57% |
+| 2026-03 | 743 | 1,103 | 1,232 | 368 | 425 | 73% | 48% |
+| 2026-04 | 720 | 1,224 | 1,130 | 385 | 379 | 73% | 54% |
+| 2026-05 | 744 | 1,076 | 979 | 342 | 299 | 68% | 62% |
+| 2026-06 | 720 | 1,034 | 1,112 | 341 | 358 | 78% | 59% |
+| 2026-07 | 744 | 968 | 949 | 330 | 319 | 75% | 66% |
+| 2026-08 | 744 | 951 | 872 | 325 | 304 | 74% | 59% |
+| 2026-09 | 720 | 1,506 | 1,374 | 468 | 457 | 63% | 52% |
+| all | 7775 | 1,272 | 1,183 | 420 | 397 | 71% | 55% |
+
+Pooled over the 11 months, ML − current: **MAE −89 MW [−168, −14]**, **pinball loss −22 MW [−53, +6]** (day-block bootstrap, 95%).
+
+The pattern on October was already visible in development. The challenger's P50 beat the current method's in 8 of 11 months. But its range covered only 38–66% of hours, against 63–78% for the current method and an 80% target. The rule was fixed in advance, so nothing was tuned in response.
+
+### What the model leans on (P50 model, share of total gain, mean of the 11 monthly models)
+
+| feature | share |
+|---|---|
+| the decision-run forecast itself | 67% |
+| last week's outturn-to-forecast ratio | 12% |
+| last week's mean error | 11% |
+| change since the previous run | 4% |
+| day of week | 3% |
+| hour of day | 1% |
+| hours ahead | 1% |
+
+In plain words, the model mostly corrects the forecast from the forecast's own level. Last week's ratio and mean error carry most of the rest. That is the same information the app's bias correction uses, applied hour by hour instead of as one scale factor. Calendar, revisions and lead time add little.
+
+### Cost backtest at £100 short / £30 long per MWh (not part of the rule)
+
+Development hours, pooled (£m):
+
+| level | current | ML | ML - current |
+|---|---|---|---|
+| P50 | 649.0 | 575.9 | -73.1 |
+| P70 | 531.0 | 487.0 | -44.0 |
+| P80 | 524.5 | 459.7 | -64.7 |
+| P90 | 562.1 | 457.3 | -104.8 |
+| P95 | 612.9 | 480.5 | -132.4 |
+
+October 2026 (528 hours, £m):
+
+| level | current | ML | ML − current |
+|---|---|---|---|
+| P50 | 45.0 | 44.7 | −0.3 |
+| P70 | 38.8 | 39.7 | +0.9 |
+| P80 | 41.1 | 38.3 | −2.8 |
+| P90 | 51.4 | 38.4 | −13.0 |
+| P95 | 56.5 | 39.0 | −17.5 |
+
+The challenger's high levels cost less mainly because they sit lower. Its upper-tail quantiles are not really P90 or P95: they are met far less often than claimed (see the coverage). So these lower costs come from different, mislabelled plans, not from a better P90. As in `docs/cost-backtest.md`, the £ figures are national GB wind volumes, not any one buyer's exposure. They mean only "would have cost £X less in this backtest at these assumptions".
+
+### Leakage guards
+
+- **Feature timing:** every feature row's latest-information timestamp is at or before its decision time, on synthetic data and on all 2025–2026 rows. Training rows always end before the first decision of the month they serve.
+- **Scrambling test:** randomising every forecast and outturn after a day's decision time leaves that day's features unchanged. A copy of the script with a deliberately leaky history window (12 hours past the decision) fails 3 of the 4 synthetic tests.
+- **Shuffled-time check, Jan 2026 P50 MAE:** targets shuffled across time give 4,714 MW, against 1,308 MW for the real model and 1,532 MW for the current method. The skill disappears when the time link is broken, as it should.
+
+### Training time
+
+- 103 s for the 11 development retrains × 6 quantile models.
+- 9.6 s for the October model (6 quantiles, 15,311 rows).
+- Measured on a 10-core Apple-silicon laptop.
+
+### Data now used
+
+October 2026 (decisions 1–22 Oct) is used by this confirmation and is no longer a holdout (`docs/data-usage.md`). Any later trial of a quantile model, for example with a calibrated range, needs a new pre-registered rule and data from November 2026 onwards.
