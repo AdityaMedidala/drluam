@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+.pytest_cache/
+node_modules/
+dist/
+*.tsbuildinfo
+.vercel/
+.env
+.DS_Store
+
+# Local Claude Code review setup (contains the private challenge brief)
+.claude/
+CLAUDE.local.md
+reviews/
+research/
+.idea/
