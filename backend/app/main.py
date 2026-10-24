@@ -3,6 +3,7 @@
 GET /api/meta                         date range, cutoff options, forecast publish schedule
 GET /api/day?date=YYYY-MM-DD&cutoff=  decision forecast vs actual for one delivery day
 GET /api/accuracy?cutoff=             accuracy of decision forecasts across January
+GET /api/plan?date=&cutoff=&confidence=  wind to plan on at C% confidence, plus its January hit rate
 """
 from __future__ import annotations
 
@@ -151,6 +152,36 @@ def day(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF):
             "maeAdjusted": float(hourly["adjError"].abs().mean()),
         },
         "series": series,
+    })
+
+
+@app.get("/api/plan")
+def plan(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF, confidence: int = 80):
+    if not FIRST_DELIVERY <= date_ <= LAST_DELIVERY:
+        raise HTTPException(400, f"date must be between {FIRST_DELIVERY} and {LAST_DELIVERY}")
+    if confidence not in an.PLAN_CONFIDENCES:
+        raise HTTPException(422, f"confidence must be one of {list(an.PLAN_CONFIDENCES)}, got {confidence}")
+    cutoff = normalise_cutoff(cutoff)
+    col = f"plan{confidence}"
+    hourly = decision_frame(cutoff)
+    hourly = hourly[hourly["deliveryDate"] == date_]
+    plan_mwh = float(hourly[col].sum(min_count=1))      # hourly MW x 1h
+    raw_mwh = float(hourly["forecast"].sum())
+    return clean({
+        "date": date_,
+        "cutoff": cutoff,
+        "confidence": confidence,
+        "hours": [{"time": r.startTime, "forecastMW": r.forecast, "adjustedMW": r.adjusted, "planMW": getattr(r, col)}
+                  for r in hourly.itertuples()],
+        "day": {
+            "planMWh": plan_mwh,
+            "rawForecastMWh": raw_mwh,
+            "adjustedMWh": float(hourly["adjusted"].sum(min_count=1)),
+            "extraToProcureMWh": raw_mwh - plan_mwh,   # energy to buy beyond what the raw forecast implies
+        },
+        # Backtest over every in-scope delivery day at this cutoff.
+        "backtest": {"period": {"firstDelivery": FIRST_DELIVERY, "lastDelivery": LAST_DELIVERY},
+                     **an.plan_hit_rate(scoped_frame(cutoff), confidence)},
     })
 
 

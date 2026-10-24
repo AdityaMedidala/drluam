@@ -20,6 +20,7 @@ UK_TZ = "Europe/London"
 TRAILING_DAYS = 7          # history used for the bias correction and the uncertainty band
 MIN_HISTORY_POINTS = 24    # need at least a day of matched hours before correcting
 ACTUAL_PERIOD = pd.Timedelta(minutes=30)  # FUELHH settlement period length
+PLAN_CONFIDENCES = (50, 70, 80, 90, 95)   # "plan on" levels: wind at least this much with C% confidence
 
 
 # --------------------------------------------------------------------------- selection
@@ -78,6 +79,9 @@ def build_decision_frame(
     Band: adjusted forecast + P10 / P90 of OUT-OF-SAMPLE residuals over the same
     window -- for each history hour, actual minus that day's own adjusted forecast
     (made with that day's own prior ratio), i.e. the errors the method really made.
+    Plan on C%: adjusted forecast + the (1 - C) quantile of those same residuals,
+    floored at 0 -- the wind we expect to see at least, C% of the time. plan90 is
+    the P10 band edge.
     No information from after the cutoff is used.
     """
     frame = select_decision_forecast(forecasts, cutoff)
@@ -103,16 +107,21 @@ def build_decision_frame(
 
     # Pass 2: band from the residuals of those earlier, genuinely out-of-sample adjusted forecasts.
     residual = frame["actual"] - frame["adjusted"]
+    plan_q = [round(1 - c / 100, 2) for c in PLAN_CONFIDENCES]
+    plan_res = [f"planRes{c}" for c in PLAN_CONFIDENCES]
     bands = []
     for day, cutoff_utc in day_cutoffs.items():
         res = residual[history(cutoff_utc)].dropna()
         if len(res) >= MIN_HISTORY_POINTS:
-            bands.append((day, res.quantile(0.1), res.quantile(0.9), len(res)))
+            bands.append((day, res.quantile(0.1), res.quantile(0.9), len(res), *res.quantile(plan_q)))
         else:
-            bands.append((day, np.nan, np.nan, len(res)))
-    frame = frame.merge(pd.DataFrame(bands, columns=["deliveryDate", "resP10", "resP90", "bandPoints"]), on="deliveryDate", how="left")
+            bands.append((day, np.nan, np.nan, len(res), *[np.nan] * len(plan_q)))
+    columns = ["deliveryDate", "resP10", "resP90", "bandPoints", *plan_res]
+    frame = frame.merge(pd.DataFrame(bands, columns=columns), on="deliveryDate", how="left")
     frame["low"] = frame["adjusted"] + frame["resP10"]
     frame["high"] = frame["adjusted"] + frame["resP90"]
+    for c, col in zip(PLAN_CONFIDENCES, plan_res):
+        frame[f"plan{c}"] = (frame["adjusted"] + frame[col]).clip(lower=0)
     frame["error"] = frame["forecast"] - frame["actual"]            # +ve = over-forecast
     frame["adjError"] = frame["adjusted"] - frame["actual"]
     return frame
@@ -190,6 +199,18 @@ def band_coverage(frame: pd.DataFrame) -> dict:
         "below": float((f["actual"] < f["low"]).mean()),
         "above": float((f["actual"] > f["high"]).mean()),
         "meanWidth": float((f["high"] - f["low"]).mean()),
+    }
+
+
+def plan_hit_rate(frame: pd.DataFrame, confidence: int) -> dict:
+    """How often the actual came in at or above the C% plan (the target is C%)."""
+    f = frame.dropna(subset=["actual", f"plan{confidence}"])
+    if f.empty:
+        return {"n": 0}
+    return {
+        "n": int(len(f)),
+        "hitRate": float((f["actual"] >= f[f"plan{confidence}"]).mean()),
+        "target": confidence / 100,
     }
 
 
