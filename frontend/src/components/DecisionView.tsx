@@ -24,7 +24,8 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
   const c = useChartColors();
   const [date, setDate] = useState(() => initialDate(meta));
   const [confidence, setConfidence] = useState(initialConfidence);
-  const [showActual, setShowActual] = useState(true);
+  // Off by default so the view shows only what was known at decision time; ?actual=1 turns it on.
+  const [showActual, setShowActual] = useState(() => readParam("actual") === "1");
   const [data, setData] = useState<DayResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<PlanResponse | null>(null);
@@ -32,6 +33,7 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
 
   useEffect(() => { writeParam("date", date); }, [date]);
   useEffect(() => { writeParam("confidence", String(confidence)); }, [confidence]);
+  useEffect(() => { writeParam("actual", showActual ? "1" : null); }, [showActual]);
 
   useEffect(() => {
     let live = true;
@@ -53,8 +55,12 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
     () => data?.series.map((p) => ({ ...p, band: p.low != null && p.high != null ? [p.low, p.high] : null })) ?? [],
     [data],
   );
+  // Ticks every 6 h in UK time: readable at phone width and correct on clock-change days.
+  const sixHourTicks = useMemo(
+    () => chartData.map((p) => p.time).filter((t) => ["00:00", "06:00", "12:00", "18:00"].includes(fmtTime(t))),
+    [chartData],
+  );
   const hasCorrection = data?.correctionRatio != null;
-  const partialHistory = data != null && data.historyPoints < data.historyPointsFull;
   const coverage = data?.bandCoverage != null ? fmtPct(data.bandCoverage) : "–";
 
   return (
@@ -75,42 +81,30 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
         </label>
       </div>
 
-      <PlanPanel plan={plan} error={planError} confidence={confidence} onConfidence={setConfidence} />
+      {data && !error && (
+        <p className="decision-context">
+          Decision for <strong>{fmtDate(data.date)}</strong>
+          {" · "}made {data.decisionTimeUtc ? fmtDateTime(data.decisionTimeUtc) : "–"} UK
+          {" · "}<span title="Hours from the forecast's publish time to the first and last delivery hour of the day">
+            using forecast published {data.forecastPublishedUtc ? fmtTime(data.forecastPublishedUtc) : "–"}
+            {data.horizonHours ? ` (${data.horizonHours[0]}–${data.horizonHours[1]} h ahead)` : ""}
+          </span>
+        </p>
+      )}
+
+      <PlanPanel plan={plan} day={data} error={planError} confidence={confidence} onConfidence={setConfidence} />
 
       {error && <ErrorState error={error} />}
       {!data && !error && <Loading />}
       {data && !error && (
         <>
-          <div className="decision-strip">
-            <div>
-              <span className="muted">Buy decision for {fmtDate(data.date)} made at</span>
-              <strong>{data.decisionTimeUtc ? fmtDateTime(data.decisionTimeUtc) : "–"} UK</strong>
-            </div>
-            <div>
-              <span className="muted">Latest forecast available then</span>
-              <strong>published {data.forecastPublishedUtc ? fmtDateTime(data.forecastPublishedUtc) : "–"}</strong>
-            </div>
-            <div title="Hours from the forecast's publish time to the first and last delivery hour of the day">
-              <span className="muted">Forecasting ahead by</span>
-              <strong>{data.horizonHours ? `${data.horizonHours[0]}–${data.horizonHours[1]} h` : "–"}</strong>
-            </div>
-          </div>
-
-          <div className="tiles">
-            <StatTile tone="accent" label="Expected wind (adjusted)"
-              value={hasCorrection ? fmtGWh(data.summary.adjustedEnergyMWh) : "–"}
-              sub={hasCorrection
-                ? <>Raw forecast says {fmtGWh(data.summary.forecastEnergyMWh)} — scaled by {data.correctionRatio!.toFixed(2)} because over the last 7 days actual wind came in {fmtPct(Math.abs(1 - data.correctionRatio!))} {data.correctionRatio! < 1 ? "below" : "above"} forecast</>
-                : "Not enough history yet to adjust"}
-              note={partialHistory ? `Partial history (${data.historyPoints} of ${data.historyPointsFull} hours): adjustment and band rest on less than a full week` : undefined} />
-            <StatTile label="Peak hour (raw forecast)" value={fmtMW(data.summary.peakForecastMW)}
-              sub="Highest hourly value in the forecast available at the cutoff" />
-            {showActual && (
+          {showActual && (
+            <div className="tiles">
               <StatTile label="What actually happened"
                 value={fmtGWh(data.summary.actualEnergyMWh)}
                 sub={<>Sum of half-hourly FUELHH wind output · average hourly error (MAE) this day: raw {fmtMW(data.summary.maeRaw)} · adjusted {fmtMW(data.summary.maeAdjusted)}</>} />
-            )}
-          </div>
+            </div>
+          )}
 
           <ChartCard wide
             title="National wind generation forecast"
@@ -125,7 +119,7 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke={c.grid} vertical={false} />
-                  <XAxis dataKey="time" tickFormatter={fmtTime} interval={5} stroke={c.axis} tickLine={false} fontSize={12} />
+                  <XAxis dataKey="time" tickFormatter={fmtTime} ticks={sixHourTicks} stroke={c.axis} tickLine={false} fontSize={12} />
                   <YAxis tickFormatter={fmtAxisGW} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} domain={[0, "auto"]} />
                   <Tooltip content={<DayTooltip showActual={showActual} />} />
                   {hasCorrection && <Area dataKey="band" stroke="none" fill={c.band} fillOpacity={0.14} connectNulls isAnimationActive={false} />}

@@ -1,25 +1,21 @@
-import type { PlanResponse } from "../api";
-import { fmtDate, fmtGWh, fmtPct } from "../format";
+import type { DayResponse, PlanResponse } from "../api";
+import { fmtGWh, fmtPct } from "../format";
 import { ErrorState, Loading } from "./ui";
 
 export const CONFIDENCES = [50, 70, 80, 90, 95];
 
-/** "How much wind can the desk count on?" at a chosen confidence, with the hit rate it really achieved. */
-export default function PlanPanel({ plan, error, confidence, onConfidence }: {
-  plan: PlanResponse | null; error: string | null; confidence: number; onConfidence: (c: number) => void;
+/** "How much wind should the desk plan on?" at a chosen confidence, with the hit rate it really achieved. */
+export default function PlanPanel({ plan, day, error, confidence, onConfidence }: {
+  plan: PlanResponse | null; day: DayResponse | null; error: string | null;
+  confidence: number; onConfidence: (c: number) => void;
 }) {
   const level = plan?.calibration.find((r) => r.confidence === confidence);
   const extra = plan?.day.extraToProcureMWh;
+  const ratio = day?.correctionRatio;
+  const partial = day != null && day.historyPoints < day.historyPointsFull;
 
   return (
     <section className="card plan">
-      <header className="card-head">
-        <div>
-          <h3>Plan on{plan ? ` · ${fmtDate(plan.date)}` : ""}</h3>
-          <p className="muted">Wind to plan on at a chosen confidence, from the adjusted forecast and the last 7 days' errors. Each option shows how often it actually held: over Nov 2025 – Sep 2026 ("held"), and in January.</p>
-        </div>
-      </header>
-
       <div className="plan-levels" role="radiogroup" aria-label="Planning confidence">
         {CONFIDENCES.map((c) => {
           const r = plan?.calibration.find((x) => x.confidence === c);
@@ -28,8 +24,7 @@ export default function PlanPanel({ plan, error, confidence, onConfidence }: {
             <button key={c} role="radio" aria-checked={c === confidence} onClick={() => onConfidence(c)}
               aria-label={`P${c}: target ${c}% of hours, held ${fmtPct(held)} of hours`}>
               <strong>P{c}</strong>
-              <span>held {fmtPct(held)} of hours</span>
-              <span className="muted">target {c}% · Jan {fmtPct(r?.januaryHitRate)}</span>
+              <span className="muted">held {fmtPct(held)}</span>
             </button>
           );
         })}
@@ -42,25 +37,48 @@ export default function PlanPanel({ plan, error, confidence, onConfidence }: {
           <p className="muted">Not enough history before this day to build a plan.</p>
         ) : (
           <div className="plan-body">
-            <div className="tiles">
-              <div className="tile tile-accent">
-                <div className="tile-label">Wind to plan on (P{confidence})</div>
-                <div className="tile-value">{fmtGWh(plan.day.planMWh)}</div>
-                <div className="tile-sub">Sum over the day of each hour's adjusted forecast + the {100 - confidence}th percentile of the last 7 days' hourly shortfalls (actual − adjusted forecast), never below 0</div>
+            <div className="ladder">
+              <div className="rung">
+                <span className="muted">Raw forecast</span>
+                <strong>{fmtGWh(plan.day.rawForecastMWh)}</strong>
               </div>
-              <div className="tile">
-                <div className="tile-label">Additional energy to procure vs the raw forecast</div>
-                <div className="tile-value">{extra != null ? `${extra >= 0 ? "+" : "−"}${fmtGWh(Math.abs(extra))}` : "–"}</div>
-                <div className="tile-sub">Raw forecast {fmtGWh(plan.day.rawForecastMWh)} minus the plan{extra != null ? ` (${Math.round(extra).toLocaleString("en-GB")} MWh)` : ""}</div>
+              <span className="ladder-arrow" aria-hidden>→</span>
+              <div className="rung">
+                <span className="muted">Expected (adjusted)</span>
+                <strong>{fmtGWh(plan.day.adjustedMWh)}</strong>
+              </div>
+              <span className="ladder-arrow" aria-hidden>→</span>
+              <div className="rung rung-plan">
+                <span className="muted">Plan on (P{confidence})</span>
+                <strong>{fmtGWh(plan.day.planMWh)}</strong>
               </div>
             </div>
-            <p className="plan-honest">
-              In January, wind came in at or above this level in <strong>{fmtPct(level.januaryHitRate)}</strong> of hours (target {confidence}%)
-              {level.developmentHitRate != null
-                ? <>; over Nov 2025 – Sep 2026, in <strong>{fmtPct(level.developmentHitRate)}</strong>.</>
-                : <>. The Nov 2025 – Sep 2026 figure was measured at the 09:00/09:20 cutoffs only.</>}
+            <p className="ladder-gap">
+              Extra to buy vs. trusting the raw forecast:{" "}
+              <strong>{extra != null ? `${extra >= 0 ? "+" : "−"}${fmtGWh(Math.abs(extra))}` : "–"}</strong>
             </p>
-            <p className="muted">The cautious plans run slightly short because whole-day drops in wind (consistent with curtailment) are more frequent than the previous week's errors suggest.</p>
+            {partial && (
+              <p className="tile-note" role="note">
+                Partial history ({day!.historyPoints} of {day!.historyPointsFull} hours): the adjustment and plan rest on less than a full week.
+              </p>
+            )}
+            <p className="plan-honest">
+              Backtested: wind came in at or above the P{confidence} plan in{" "}
+              {level.developmentHitRate != null
+                ? <><strong>{fmtPct(level.developmentHitRate)}</strong> of hours (Nov 2025–Sep 2026); <strong>{fmtPct(level.januaryHitRate)}</strong> in January.</>
+                : <><strong>{fmtPct(level.januaryHitRate)}</strong> of January hours (target {confidence}%). The Nov 2025–Sep 2026 figure was measured at the 09:00/09:20 cutoffs only.</>}
+            </p>
+            <p className="muted">The cautious plans run slightly short because whole-day shortfalls in metered wind output (possibly curtailment, not confirmed) are more frequent than the previous week's errors suggest.</p>
+            <details className="table-toggle">
+              <summary>How is this calculated?</summary>
+              <ul className="plan-method">
+                <li><strong>Raw forecast:</strong> the day's total from the latest Elexon WINDFOR forecast published at or before the cutoff (hourly MW × 1 h).</li>
+                <li><strong>Expected (adjusted):</strong> raw forecast × {ratio != null ? ratio.toFixed(2) : "the ratio"}, the ratio of actual to forecast wind over the previous 7 days, using only actuals known at the cutoff{ratio != null ? <> (actual came in {fmtPct(Math.abs(1 - ratio))} {ratio < 1 ? "below" : "above"} forecast)</> : null}.</li>
+                <li><strong>Plan on (P{confidence}):</strong> for each hour, the adjusted forecast + the {100 - confidence}th percentile of the last 7 days' hourly shortfalls (actual − adjusted forecast), never below 0; summed over the day.</li>
+                <li><strong>Extra to buy:</strong> raw forecast − plan.</li>
+                <li><strong>Held / backtested:</strong> the share of past hours whose actual came in at or above the plan. January 2026 is the app's own data; Nov 2025–Sep 2026 (7,775 hours) comes from the same method run offline on those months. Past results, not a guarantee.</li>
+              </ul>
+            </details>
           </div>
         )
       )}

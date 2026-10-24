@@ -68,11 +68,6 @@ select, input[type="date"] {
 .date-nav button:disabled { opacity: 0.4; cursor: default; }
 .toggle { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; }
 
-.decision-strip {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;
-  background: var(--accent-soft); border-radius: var(--radius); padding: 14px 16px;
-}
-.decision-strip div { display: flex; flex-direction: column; gap: 2px; }
 
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
 .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
@@ -139,3 +134,17 @@ select, input[type="date"] {
 .plan-body { display: flex; flex-direction: column; gap: 10px; }
 .plan-honest { font-size: 0.92rem; }
 @media (max-width: 640px) { .plan-levels { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.decision-context { font-size: 0.95rem; color: var(--text-2); }
+.decision-context strong { color: var(--text); }
+.ladder { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
+.rung { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; }
+.rung strong { font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.rung-plan { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.rung-plan strong { font-size: 1.8rem; }
+.ladder-arrow { align-self: center; color: var(--muted); font-size: 1.2rem; }
+.ladder-gap { font-size: 0.95rem; }
+.plan-method { margin: 8px 0 0; padding-left: 18px; color: var(--text-2); display: grid; gap: 4px; }
+@media (max-width: 640px) {
+  .ladder { flex-direction: column; gap: 6px; }
+  .ladder-arrow { transform: rotate(90deg); }
+}
