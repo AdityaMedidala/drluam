@@ -4,6 +4,7 @@ GET /api/meta                         date range, cutoff options, forecast publi
 GET /api/day?date=YYYY-MM-DD&cutoff=  decision forecast vs actual for one delivery day
 GET /api/accuracy?cutoff=             accuracy of decision forecasts across January
 GET /api/plan?date=&cutoff=&confidence=  wind to plan on at C% confidence, plus its January hit rate
+GET /api/drift?date=&cutoff=          every forecast run for that day up to the cutoff (forecast drift)
 """
 from __future__ import annotations
 
@@ -201,6 +202,30 @@ def plan(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF, c
                      **an.plan_hit_rate(scoped_frame(cutoff), confidence)},
         "calibration": plan_calibration(cutoff),
     })
+
+
+@app.get("/api/drift")
+def drift(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF):
+    if not FIRST_DELIVERY <= date_ <= LAST_DELIVERY:
+        raise HTTPException(400, f"date must be between {FIRST_DELIVERY} and {LAST_DELIVERY}")
+    cutoff = normalise_cutoff(cutoff)
+    runs = an.forecast_runs(load_forecasts(), date_, time.fromisoformat(cutoff))
+    latest = runs["publishTime"].max() if len(runs) else None
+    hours_in_day = int(decision_frame(cutoff)["deliveryDate"].eq(date_).sum())
+    # Hours every run covers: the like-for-like basis for comparing runs.
+    n_runs = runs["publishTime"].nunique()
+    common = runs.groupby("startTime")["publishTime"].nunique().loc[lambda c: c == n_runs].index
+    out = []
+    for pub, g in runs.groupby("publishTime", sort=True):
+        out.append({
+            "publishedUtc": pub,
+            "isDecisionRun": pub == latest,
+            "hours": [{"time": t, "forecastMW": v} for t, v in zip(g["startTime"], g["forecast"])],
+            # Day total only when the run covers every hour of the day (early runs may not reach it all).
+            "dayMWh": float(g["forecast"].sum()) if len(g) == hours_in_day else None,
+            "commonMWh": float(g.loc[g["startTime"].isin(common), "forecast"].sum()),
+        })
+    return clean({"date": date_, "cutoff": cutoff, "commonHours": len(common), "runs": out})
 
 
 @app.get("/api/accuracy")

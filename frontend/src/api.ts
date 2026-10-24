@@ -101,6 +101,16 @@ export interface PlanResponse {
   calibration: PlanLevel[];
 }
 
+export interface DriftRun {
+  publishedUtc: string;
+  isDecisionRun: boolean;
+  hours: { time: string; forecastMW: number }[];
+  dayMWh: number | null;     // null when the run doesn't cover every hour of the day
+  commonMWh: number;         // total over the hours every run covers
+}
+
+export interface DriftResponse { date: string; cutoff: string; commonHours: number; runs: DriftRun[] }
+
 async function get<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const qs = new URLSearchParams(params).toString();
   const res = await fetch(`/api${path}${qs ? `?${qs}` : ""}`);
@@ -112,6 +122,7 @@ export const api = {
   meta: () => get<Meta>("/meta"),
   day: (date: string, cutoff: string) => get<DayResponse>("/day", { date, cutoff }),
   accuracy: (cutoff: string) => get<AccuracyResponse>("/accuracy", { cutoff }),
+  drift: (date: string, cutoff: string) => get<DriftResponse>("/drift", { date, cutoff }),
   plan: (date: string, cutoff: string, confidence: number) =>
     get<PlanResponse>("/plan", { date, cutoff, confidence: String(confidence) }),
 };

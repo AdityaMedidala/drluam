@@ -33,7 +33,7 @@ A web app for a UK utility's day-ahead power buying team. It answers two questio
 flowchart LR
   E[Elexon BMRS API<br/>WINDFOR + FUELHH] -->|scripts/fetch_data.py| D[(backend/data/*.csv<br/>January snapshot)]
   D --> A[analysis.py<br/>pick decision forecast<br/>correction + metrics]
-  A --> API[FastAPI<br/>/api/meta /api/day /api/accuracy /api/plan]
+  A --> API[FastAPI<br/>/api/meta /api/day /api/accuracy /api/plan /api/drift]
   API --> UI[React + Recharts<br/>Decision view / Accuracy view]
 ```
 

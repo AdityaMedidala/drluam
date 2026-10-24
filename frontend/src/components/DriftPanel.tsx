@@ -1,0 +1,82 @@
+import { useMemo } from "react";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import type { DriftResponse } from "../api";
+import { fmtDateTime, fmtGWh, fmtMW, fmtTime, gwAxis } from "../format";
+import type { ChartColors } from "../theme";
+import { ChartCard, ErrorState, LegendItem, Loading } from "./ui";
+
+/** How the forecast for one delivery day moved across the runs published up to the cutoff. */
+export default function DriftPanel({ drift, error, c }: { drift: DriftResponse | null; error: string | null; c: ChartColors }) {
+  const runs = drift?.runs ?? [];
+  const rows = useMemo(() => {
+    const byTime = new Map<string, Record<string, number | string>>();
+    runs.forEach((r, i) => r.hours.forEach((h) => {
+      const row = byTime.get(h.time) ?? { time: h.time };
+      row[`r${i}`] = h.forecastMW;
+      byTime.set(h.time, row);
+    }));
+    return [...byTime.values()].sort((a, b) => String(a.time).localeCompare(String(b.time)));
+  }, [runs]);
+  const ticks = useMemo(
+    () => rows.map((r) => String(r.time)).filter((t) => ["00:00", "06:00", "12:00", "18:00"].includes(fmtTime(t))),
+    [rows],
+  );
+
+  if (error) return <ErrorState error={error} />;
+  if (!drift) return <Loading rows={1} />;
+  if (runs.length === 0) return <p className="muted">No forecast runs before the cutoff for this day.</p>;
+
+  const first = runs[0];
+  const decision = runs[runs.length - 1];
+  const change = decision.commonMWh - first.commonMWh;
+
+  return (
+    <ChartCard wide
+      title="Forecast drift"
+      subtitle={<>Every WINDFOR run published up to the cutoff, for this day's hours · on the {drift.commonHours} hours all {runs.length} runs cover,
+        the forecast went from <strong>{fmtGWh(first.commonMWh)}</strong> (first run, {fmtDateTime(first.publishedUtc)}) to <strong>{fmtGWh(decision.commonMWh)}</strong> (decision run),
+        {" "}{change >= 0 ? "+" : "−"}{fmtGWh(Math.abs(change))}</>}
+      legend={<>
+        <LegendItem color={c.axis} label={`Earlier runs (${runs.length - 1})`} />
+        <LegendItem color={c.forecast} label={`Decision run (${fmtDateTime(decision.publishedUtc)})`} />
+      </>}>
+      <div className="chart-md">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={rows} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+            <CartesianGrid stroke={c.grid} vertical={false} />
+            <XAxis dataKey="time" tickFormatter={fmtTime} ticks={ticks} stroke={c.axis} tickLine={false} fontSize={12} />
+            <YAxis {...gwAxis(runs.flatMap((r) => r.hours.map((h) => h.forecastMW)))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
+            <Tooltip content={({ active, payload }) =>
+              active && payload?.length ? (
+                <div className="tooltip">
+                  <div className="tooltip-title">{fmtTime(String(payload[0].payload.time))} UK</div>
+                  <div className="tooltip-row"><span>First run</span><strong>{fmtMW(payload[0].payload.r0 as number | undefined)}</strong></div>
+                  <div className="tooltip-row"><span>Decision run</span><strong>{fmtMW(payload[0].payload[`r${runs.length - 1}`] as number | undefined)}</strong></div>
+                </div>
+              ) : null} />
+            {runs.map((r, i) => (
+              <Line key={r.publishedUtc} dataKey={`r${i}`} dot={false} isAnimationActive={false} connectNulls
+                stroke={r.isDecisionRun ? c.forecast : c.axis}
+                strokeWidth={r.isDecisionRun ? 2 : 1}
+                strokeOpacity={r.isDecisionRun ? 1 : 0.25 + 0.5 * (i / Math.max(1, runs.length - 1))} />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <details className="table-toggle">
+        <summary>View as table</summary>
+        <table>
+          <thead><tr><th>Run published (UK)</th><th>Hours of the day</th><th>Total, common {drift.commonHours} h</th><th>Day total</th></tr></thead>
+          <tbody>
+            {runs.map((r) => (
+              <tr key={r.publishedUtc}>
+                <td>{fmtDateTime(r.publishedUtc)}{r.isDecisionRun ? " (decision)" : ""}</td>
+                <td>{r.hours.length}</td><td>{fmtGWh(r.commonMWh)}</td><td>{fmtGWh(r.dayMWh)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    </ChartCard>
+  );
+}

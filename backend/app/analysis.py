@@ -63,6 +63,20 @@ def select_decision_forecast(
     ]
 
 
+def forecast_runs(forecasts: pd.DataFrame, delivery_date, cutoff: time = time(9, 0), tz: str = UK_TZ) -> pd.DataFrame:
+    """Every forecast run published at or before the D-1 cutoff, for the hours of one delivery day.
+
+    Shows how the forecast for that day drifted across runs; the latest run is the
+    one the decision uses. Returns columns publishTime, startTime, forecast.
+    """
+    cutoff_utc = (pd.Timestamp(delivery_date) - pd.Timedelta(days=1) + pd.Timedelta(hours=cutoff.hour, minutes=cutoff.minute)
+                  ).tz_localize(tz, ambiguous="NaT", nonexistent="shift_forward").tz_convert("UTC")
+    day = forecasts["startTime"].dt.tz_convert(tz).dt.date == delivery_date
+    runs = forecasts[day & (forecasts["publishTime"] <= cutoff_utc)]
+    return runs.rename(columns={"generation": "forecast"})[["publishTime", "startTime", "forecast"]].sort_values(
+        ["publishTime", "startTime"]).reset_index(drop=True)
+
+
 # --------------------------------------------------------------------------- decision frame
 def build_decision_frame(
     forecasts: pd.DataFrame,

@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { api, type DayResponse, type Meta, type PlanResponse } from "../api";
+import { api, type DayResponse, type DriftResponse, type Meta, type PlanResponse } from "../api";
 import { gwAxis, fmtDate, fmtDateTime, fmtGWh, fmtMW, fmtPct, fmtTime, shiftDate } from "../format";
 import { useChartColors } from "../theme";
 import { readParam, writeParam } from "../url";
+import DriftPanel from "./DriftPanel";
 import PlanPanel, { CONFIDENCES } from "./PlanPanel";
 import { ChartCard, ErrorState, LegendItem, Loading, StatTile } from "./ui";
 
@@ -30,6 +31,8 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<PlanResponse | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
+  const [drift, setDrift] = useState<DriftResponse | null>(null);
+  const [driftError, setDriftError] = useState<string | null>(null);
 
   useEffect(() => { writeParam("date", date); }, [date]);
   useEffect(() => { writeParam("confidence", String(confidence)); }, [confidence]);
@@ -50,6 +53,14 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
     api.plan(date, cutoff, confidence).then((p) => live && setPlan(p)).catch((e) => live && setPlanError(String(e)));
     return () => { live = false; };
   }, [date, cutoff, confidence]);
+
+  useEffect(() => {
+    let live = true;
+    setDrift(null);
+    setDriftError(null);
+    api.drift(date, cutoff).then((d) => live && setDrift(d)).catch((e) => live && setDriftError(String(e)));
+    return () => { live = false; };
+  }, [date, cutoff]);
 
   const chartData = useMemo(
     () => data?.series.map((p) => ({ ...p, band: p.low != null && p.high != null ? [p.low, p.high] : null })) ?? [],
@@ -144,6 +155,8 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
               </table>
             </details>
           </ChartCard>
+
+          <DriftPanel drift={drift} error={driftError} c={c} />
         </>
       )}
     </div>
