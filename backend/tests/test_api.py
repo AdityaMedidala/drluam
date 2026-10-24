@@ -81,3 +81,16 @@ def test_startup_loads_data():
     load_actuals.cache_clear(); load_forecasts.cache_clear()
     with TestClient(app):  # runs the lifespan startup
         assert load_actuals.cache_info().currsize == 1 and load_forecasts.cache_info().currsize == 1
+
+
+def test_clean_maps_nat_and_inf_to_null():
+    import json
+
+    import numpy as np
+    import pandas as pd
+
+    from app.main import clean
+    out = clean({"nat": pd.NaT, "inf": float("inf"), "ninf": np.float64(-np.inf), "nan": np.nan,
+                 "ts": pd.Timestamp("2026-01-02T00:00Z"), "n": [np.int64(3), 1.23456]})
+    assert out == {"nat": None, "inf": None, "ninf": None, "nan": None, "ts": "2026-01-02T00:00:00Z", "n": [3, 1.2346]}
+    json.dumps(out, allow_nan=False)  # strictly valid JSON

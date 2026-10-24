@@ -48,15 +48,17 @@ def normalise_cutoff(value: str) -> str:
 
 
 def clean(obj):
-    """Make pandas/numpy output JSON-safe: NaN -> None, timestamps -> ISO strings."""
+    """Make pandas/numpy output JSON-safe: NaN/inf/NaT -> None, timestamps -> ISO strings."""
     if isinstance(obj, dict):
         return {k: clean(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [clean(v) for v in obj]
+    if obj is pd.NaT:
+        return None
     if isinstance(obj, np.generic):
         obj = obj.item()
     if isinstance(obj, float):
-        return None if math.isnan(obj) else round(obj, 4)
+        return round(obj, 4) if math.isfinite(obj) else None
     if isinstance(obj, pd.Timestamp):
         return None if pd.isna(obj) else obj.isoformat().replace("+00:00", "Z")
     if isinstance(obj, date):
