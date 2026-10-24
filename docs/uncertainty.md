@@ -128,7 +128,7 @@ The rule says no finalist is tested. This table shows how C2, the would-be final
 
 The adaptive bands C1 and C3 do what conformal methods promise: their coverage moves close to 80% in almost every month. But they get there by widening the band by 24–52%, and that costs more pinball loss than the misses it removes. This is *calibrated but wide* in practice: a trader would get an honest band that barely narrows the decision.
 
-The level-scaled band C2 is the most interesting. It beats B0 on pinball in June–September and January, when errors were large at high wind, but loses in most other months. It is not consistent enough to pass a rule written in advance.
+The level-scaled band C2 is the most interesting. It beats B0 on pinball in June–September and January, but loses in the other six months. It is not consistent enough to pass a rule written in advance.
 
 The likely reason all three fall short is the one found in `docs/error-anatomy.md`. The big misses are whole days with a level error (worst days 25–48% too high), and no amount of reshaping last week's residuals predicts those. A better band probably needs an input that explains them, such as curtailment, demand or day-type data, rather than a better treatment of the same residuals.
 
