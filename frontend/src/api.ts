@@ -26,6 +26,7 @@ export interface DayResponse {
   horizonHours: [number, number] | null;
   correctionRatio: number | null;
   historyPoints: number;
+  historyPointsFull: number;
   bandCoverage: number | null;   // share of all in-scope hours whose actual fell inside the band
   summary: {
     forecastEnergyMWh: number;

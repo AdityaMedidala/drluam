@@ -22,6 +22,7 @@ def test_day_has_full_half_hourly_series():
     # The forecast used must be published before 09:00 UK on the 14th.
     assert body["forecastPublishedUtc"] <= "2026-01-14T09:00:00Z"
     assert body["decisionTimeUtc"] == "2026-01-14T09:00:00Z"
+    assert body["historyPoints"] == body["historyPointsFull"] == 168
 
 
 def test_day_rejects_out_of_scope_date():

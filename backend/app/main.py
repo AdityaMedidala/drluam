@@ -138,6 +138,7 @@ def day(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF):
         "horizonHours": [hourly["horizonHours"].min(), hourly["horizonHours"].max()] if len(hourly) else None,
         "correctionRatio": first["ratio"] if first is not None else None,
         "historyPoints": int(first["historyPoints"]) if first is not None else 0,
+        "historyPointsFull": an.TRAILING_DAYS * 24,   # a complete trailing week of hourly matches
         # Realised coverage of the band over all delivery days at this cutoff, for labelling.
         "bandCoverage": an.band_coverage(scoped_frame(cutoff)).get("coverage"),
         "summary": {

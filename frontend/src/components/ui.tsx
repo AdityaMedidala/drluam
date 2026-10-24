@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 
-export function StatTile({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: "accent" }) {
+export function StatTile({ label, value, sub, note, tone }: { label: string; value: ReactNode; sub?: ReactNode; note?: string; tone?: "accent" }) {
   return (
     <div className={`tile ${tone === "accent" ? "tile-accent" : ""}`}>
       <div className="tile-label">{label}</div>
       <div className="tile-value">{value}</div>
       {sub && <div className="tile-sub">{sub}</div>}
+      {note && <div className="tile-sub tile-note" role="note">{note}</div>}
     </div>
   );
 }

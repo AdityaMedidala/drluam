@@ -32,6 +32,7 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
     [data],
   );
   const hasCorrection = data?.correctionRatio != null;
+  const partialHistory = data != null && data.historyPoints < data.historyPointsFull;
   const coverage = data?.bandCoverage != null ? fmtPct(data.bandCoverage) : "–";
 
   return (
@@ -76,7 +77,8 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
               value={hasCorrection ? fmtGWh(data.summary.adjustedEnergyMWh) : "–"}
               sub={hasCorrection
                 ? <>Raw forecast says {fmtGWh(data.summary.forecastEnergyMWh)} — scaled by {data.correctionRatio!.toFixed(2)} after the last 7 days ran high</>
-                : "Not enough history yet to adjust"} />
+                : "Not enough history yet to adjust"}
+              note={partialHistory ? `Partial history (${data.historyPoints} of ${data.historyPointsFull} hours): adjustment and band rest on less than a full week` : undefined} />
             <StatTile label="Low case (P10)"
               value={hasCorrection ? fmtGWh(lowEnergy) : "–"}
               sub="Cautious floor: every hour at the bottom of its band (the band's P10 of last week's adjusted-forecast errors)" />
