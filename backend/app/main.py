@@ -126,6 +126,8 @@ def meta():
         "firstDelivery": FIRST_DELIVERY.isoformat(),
         "lastDelivery": LAST_DELIVERY.isoformat(),
         "defaultCutoff": DEFAULT_CUTOFF,
+        # A typical day to open on (median daily MAE and P90 hit rate); any day stays reachable.
+        "representativeDelivery": an.representative_day(scoped_frame(DEFAULT_CUTOFF)).isoformat(),
         "cutoffOptions": CUTOFF_OPTIONS,
         # Times forecasts are routinely published (UTC); one-off re-publishes are excluded.
         "publishSchedule": sorted(schedule[schedule > 5].index.tolist()),

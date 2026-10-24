@@ -1,4 +1,5 @@
 """Smoke tests against the real January snapshot in data/."""
+import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
@@ -112,3 +113,17 @@ def test_clean_maps_nat_and_inf_to_null():
                  "ts": pd.Timestamp("2026-01-02T00:00Z"), "n": [np.int64(3), 1.23456]})
     assert out == {"nat": None, "inf": None, "ninf": None, "nan": None, "ts": "2026-01-02T00:00:00Z", "n": [3, 1.2346]}
     json.dumps(out, allow_nan=False)  # strictly valid JSON
+
+
+def test_meta_offers_a_representative_default_day():
+    from app.analysis import representative_day
+    from app.main import scoped_frame
+    rep = client.get("/api/meta").json()["representativeDelivery"]
+    assert "2026-01-02" <= rep <= "2026-02-01"
+    # The pick's daily MAE and P90 hit rate both sit in the middle third of January's days.
+    f = scoped_frame("09:20").dropna(subset=["actual", "plan90"])
+    daily = f.assign(err=(f["forecast"] - f["actual"]).abs(), hit=f["actual"] >= f["plan90"]).groupby("deliveryDate")[["err", "hit"]].mean()
+    day = daily.loc[pd.Timestamp(rep).date()]
+    for col in ("err", "hit"):
+        assert daily[col].quantile(1 / 3) <= day[col] <= daily[col].quantile(2 / 3)
+    assert str(representative_day(f)) == rep

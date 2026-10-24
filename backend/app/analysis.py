@@ -216,6 +216,17 @@ def band_coverage(frame: pd.DataFrame) -> dict:
     }
 
 
+def representative_day(frame: pd.DataFrame):
+    """The delivery day closest to the period's median on both daily NESO-forecast MAE and daily P90
+    hit rate (by rank, so neither metric's scale dominates); ties go to the earlier day."""
+    f = frame.dropna(subset=["actual", "plan90"])
+    daily = f.assign(err=(f["forecast"] - f["actual"]).abs(), hit=f["actual"] >= f["plan90"]) \
+             .groupby("deliveryDate")[["err", "hit"]].mean()
+    ranks = daily.rank(pct=True)
+    distance = (ranks - 0.5).abs().sum(axis=1)
+    return distance.sort_index().idxmin()
+
+
 def plan_hit_rate(frame: pd.DataFrame, confidence: int) -> dict:
     """How often the actual came in at or above the C% plan (the target is C%)."""
     f = frame.dropna(subset=["actual", f"plan{confidence}"])
