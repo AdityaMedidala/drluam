@@ -33,7 +33,7 @@ A web app for a UK utility's day-ahead power buying team. It answers two questio
 flowchart LR
   E[Elexon BMRS API<br/>WINDFOR + FUELHH] -->|scripts/fetch_data.py| D[(backend/data/*.csv<br/>January snapshot)]
   D --> A[analysis.py<br/>pick decision forecast<br/>correction + metrics]
-  A --> API[FastAPI<br/>/api/meta /api/day /api/accuracy /api/plan /api/drift]
+  A --> API[FastAPI<br/>/api/meta /api/day /api/accuracy /api/plan /api/drift /api/cost]
   API --> UI[React + Recharts<br/>Decision view / Accuracy view]
 ```
 
@@ -154,6 +154,7 @@ Outside the app; each analysis runs the app's own logic unchanged on other month
 - [docs/validation.md](docs/validation.md): on Nov 2025 – Mar 2026 the correction removes 82–102% of the bias and cuts MAE by 10–54% in every month. The band under-covers everywhere (64–73% vs 80%). Against naive references (Nov 2025 – Sep 2026, day-block bootstrap): the correction beats the raw forecast by 30% pooled (95% CI +26% to +34%), with an interval above zero in 10 of 11 months (three only just), and both forecasts beat persistence in every month (raw by 42–69%, adjusted by 52–78%).
 - [docs/error-anatomy.md](docs/error-anatomy.md): across Nov 2025 – Sep 2026 the error is mostly whole-day level, not timing (a per-day level fix would remove 55% of MAE, a time shift 17%). The forecast catches only half of >2 GW ramps.
 - [docs/plan-backtest.md](docs/plan-backtest.md): the planning volume at each exceedance level is about right at P50 but under-covers in the tail. Across Nov 2025 – Sep 2026 the P90 planning volume had a hit rate of 84% and the P95 volume 89% (January: 82% and 89%).
+- [docs/cost-backtest.md](docs/cost-backtest.md): the cost-aware exceedance level (illustrative). At £100 short and £30 long per MWh the newsvendor ratio recommends P80, which was also the lowest-cost level pooled over Nov 2025 – Sep 2026. In January P70 cost least, £4.6m below P80. P80 would have cost £67m less than the NESO forecast in January in this backtest, at these assumptions.
 - [docs/uncertainty.md](docs/uncertainty.md): three alternative bands were tested against a rule fixed in advance. None beat the current band on pinball loss, so it is kept.
 - [docs/method-candidates.md](docs/method-candidates.md): the one change worth confirming later, a band built from 14 days of residuals, is **promising, unconfirmed**: it raised coverage in 10 of 11 months. Its adoption rule is written down for Nov 2026+ data; nothing new is adopted before submission.
 
