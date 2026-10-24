@@ -90,7 +90,7 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
               <span className="muted">Latest forecast available then</span>
               <strong>published {data.forecastPublishedUtc ? fmtDateTime(data.forecastPublishedUtc) : "–"}</strong>
             </div>
-            <div>
+            <div title="Hours from the forecast's publish time to the first and last delivery hour of the day">
               <span className="muted">Forecasting ahead by</span>
               <strong>{data.horizonHours ? `${data.horizonHours[0]}–${data.horizonHours[1]} h` : "–"}</strong>
             </div>
@@ -103,17 +103,18 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
                 ? <>Raw forecast says {fmtGWh(data.summary.forecastEnergyMWh)} — scaled by {data.correctionRatio!.toFixed(2)} because over the last 7 days actual wind came in {fmtPct(Math.abs(1 - data.correctionRatio!))} {data.correctionRatio! < 1 ? "below" : "above"} forecast</>
                 : "Not enough history yet to adjust"}
               note={partialHistory ? `Partial history (${data.historyPoints} of ${data.historyPointsFull} hours): adjustment and band rest on less than a full week` : undefined} />
-            <StatTile label="Peak hour (raw forecast)" value={fmtMW(data.summary.peakForecastMW)} />
+            <StatTile label="Peak hour (raw forecast)" value={fmtMW(data.summary.peakForecastMW)}
+              sub="Highest hourly value in the forecast available at the cutoff" />
             {showActual && (
               <StatTile label="What actually happened"
                 value={fmtGWh(data.summary.actualEnergyMWh)}
-                sub={<>Avg hourly error: raw {fmtMW(data.summary.maeRaw)} · adjusted {fmtMW(data.summary.maeAdjusted)}</>} />
+                sub={<>Sum of half-hourly FUELHH wind output · average hourly error (MAE) this day: raw {fmtMW(data.summary.maeRaw)} · adjusted {fmtMW(data.summary.maeAdjusted)}</>} />
             )}
           </div>
 
           <ChartCard wide
             title="National wind generation forecast"
-            subtitle={<>Forecast available at decision time, hourly · band = adjusted forecast + P10–P90 of the last 7 days' adjusted-forecast errors · in January the actual landed inside it in <strong>{coverage}</strong> of hours (not 80%)</>}
+            subtitle={<>Forecast available at decision time, hourly · band = adjusted forecast + P10–P90 of the last 7 days' misses (actual − adjusted forecast) · in January the actual landed inside it in <strong>{coverage}</strong> of hours (not 80%)</>}
             legend={<>
               <LegendItem color={c.forecast} label="Raw forecast" />
               {hasCorrection && <LegendItem color={c.adjusted} label="Adjusted forecast" />}

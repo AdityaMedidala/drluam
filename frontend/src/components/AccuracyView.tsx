@@ -43,8 +43,8 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
       <Insight>
         In January the forecast available at decision time was <strong>too high in {fmtPct(raw.overForecastShare)} of hours</strong>,
         by <strong>{fmtMW(raw.bias)}</strong> on average. A desk buying against the raw forecast would have
-        systematically under-bought. Rescaling by the previous week's track record <strong>removes ~{fmtPct(biasRemoved)} of the bias</strong> and
-        cuts the typical error by <strong>~{fmtPct(improvement)}</strong>; it beat the raw forecast on {cmp.daysAdjustedBetter} of {cmp.days} days.
+        tended to under-buy. Rescaling by the previous week's track record <strong>removed ~{fmtPct(biasRemoved)} of the bias</strong> and
+        cut the typical error by <strong>~{fmtPct(improvement)}</strong> in January; it beat the raw forecast on {cmp.daysAdjustedBetter} of {cmp.days} days.
         Its uncertainty band held the actual in {fmtPct(band.coverage)} of hours, short of the 80% it aims for.
       </Insight>
 
@@ -199,7 +199,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
         </ChartCard>
 
         <ChartCard wide title="Day by day"
-          subtitle="Typical hourly error for each delivery day — the adjustment helps most on days the raw forecast overshoots"
+          subtitle="Typical hourly error (MAE) for each delivery day — the adjustment tended to help most on days the raw forecast overshot"
           legend={<><LegendItem color={c.forecast} label="Raw" /><LegendItem color={c.adjusted} label="Adjusted" /></>}
         >
           <div className="chart-md">
@@ -228,11 +228,16 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
       <section className="card method">
         <h3>How these numbers are calculated</h3>
         <ul>
-          <li><strong>Forecast used:</strong> for each delivery hour, the latest Elexon WINDFOR forecast published before the decision cutoff ({data.cutoff} UK the day before). Later forecasts are ignored — the desk couldn't have seen them in time.</li>
+          <li><strong>Forecast used:</strong> for each delivery hour, the latest Elexon WINDFOR forecast published at or before the decision cutoff ({data.cutoff} UK the day before). Later forecasts are ignored — the desk couldn't have seen them in time.</li>
           <li><strong>Actual:</strong> Elexon FUELHH wind generation for the same hour.</li>
           <li><strong>Adjusted forecast:</strong> raw forecast × (actual ÷ forecast) over the previous 7 days, using only actuals already known at the cutoff.</li>
-          <li><strong>Band:</strong> adjusted forecast + the 10th–90th percentile of the errors the adjusted forecast actually made over the previous 7 days (each of those days adjusted with its own prior week). Measured coverage: {fmtPct(band.coverage)} of {band.n} hours.</li>
+          <li><strong>Band:</strong> adjusted forecast + the 10th–90th percentile of what the adjusted forecast actually missed by (actual − adjusted) over the previous 7 days (each of those days adjusted with its own prior week). Measured coverage: {fmtPct(band.coverage)} of {band.n} hours.</li>
           <li><strong>Error</strong> = forecast − actual. Positive means the forecast was too high, i.e. the risk of buying too little.</li>
+          <li><strong>Period:</strong> every figure on this page covers decisions made in January 2026, i.e. delivery days {fmtDate(data.period.firstDelivery)} – {fmtDate(data.period.lastDelivery)}, hourly, unless it says Nov 2025 – Sep 2026.</li>
+          <li><strong>Typical error (MAE):</strong> the average of |error| over those hours. <strong>Error as share of output (nMAE):</strong> MAE ÷ average actual generation. <strong>Bias:</strong> the average error, with its sign.</li>
+          <li><strong>Bias removed:</strong> 1 − adjusted bias ÷ raw bias, on the same hours. <strong>Raw error range:</strong> the 10th and 90th percentiles of hourly raw errors.</li>
+          <li><strong>Plan hit rate:</strong> the share of hours the actual came in at or above a "plan on" level (target = the level). The Nov 2025 – Sep 2026 figures come from the same method run offline on those months (7,775 hours) and are shown at the 09:00/09:20 cutoffs only.</li>
+          <li>All figures are measured on past data. They describe how the method did, not a guarantee of how it will do.</li>
         </ul>
       </section>
     </div>

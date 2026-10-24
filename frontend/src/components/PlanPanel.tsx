@@ -16,7 +16,7 @@ export default function PlanPanel({ plan, error, confidence, onConfidence }: {
       <header className="card-head">
         <div>
           <h3>Plan on{plan ? ` · ${fmtDate(plan.date)}` : ""}</h3>
-          <p className="muted">Wind the desk can count on at a chosen confidence, from the adjusted forecast and the last 7 days' errors. Each option shows how often it actually held: over Nov 2025 – Sep 2026 ("held"), and in January.</p>
+          <p className="muted">Wind to plan on at a chosen confidence, from the adjusted forecast and the last 7 days' errors. Each option shows how often it actually held: over Nov 2025 – Sep 2026 ("held"), and in January.</p>
         </div>
       </header>
 
@@ -46,7 +46,7 @@ export default function PlanPanel({ plan, error, confidence, onConfidence }: {
               <div className="tile tile-accent">
                 <div className="tile-label">Wind to plan on (P{confidence})</div>
                 <div className="tile-value">{fmtGWh(plan.day.planMWh)}</div>
-                <div className="tile-sub">Sum of the hourly P{confidence} plan for the delivery day</div>
+                <div className="tile-sub">Sum over the day of each hour's adjusted forecast + the {100 - confidence}th percentile of the last 7 days' hourly shortfalls (actual − adjusted forecast), never below 0</div>
               </div>
               <div className="tile">
                 <div className="tile-label">Additional energy to procure vs the raw forecast</div>
