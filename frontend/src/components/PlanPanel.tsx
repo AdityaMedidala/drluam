@@ -86,7 +86,7 @@ export default function PlanPanel({ plan, day, error, confidence, onConfidence }
               <ul className="plan-method">
                 <li><strong>Raw forecast:</strong> the day's total from the latest Elexon WINDFOR forecast published at or before the cutoff (hourly MW × 1 h).</li>
                 <li><strong>Expected (adjusted):</strong> raw forecast × {ratio != null ? ratio.toFixed(2) : "the ratio"}, the ratio of actual to forecast wind over the previous 7 days, using only actuals known at the cutoff{ratio != null ? <> (actual came in {fmtPct(Math.abs(1 - ratio))} {ratio < 1 ? "below" : "above"} forecast)</> : null}.</li>
-                <li><strong>Plan on (P{confidence}):</strong> for each hour, the adjusted forecast + the {100 - confidence}th percentile of the last 7 days' hourly shortfalls (actual − adjusted forecast), never below 0; summed over the day.</li>
+                <li><strong>Plan on (P{confidence}):</strong> for each hour, the adjusted forecast + the {100 - confidence}th percentile of the last 7 days' hourly misses (actual − adjusted forecast, positive or negative), never below 0; summed over the day.</li>
                 <li><strong>Extra to buy:</strong> raw forecast − plan.</li>
                 <li><strong>Held / backtested:</strong> the share of past hours whose actual came in at or above the plan. January 2026 is the app's own data; Nov 2025–Sep 2026 (7,775 hours) comes from the same method run offline on those months. Past results, not a guarantee.</li>
               </ul>
