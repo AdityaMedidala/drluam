@@ -26,15 +26,15 @@ Target: P50 = 50%, P70 = 70%, P80 = 80%, P90 = 90%, P95 = 95%.
 | 2026-09 | 720 | 49% | 63% | 71% | 80% | 89% |
 | **all 11 months** | 7,775 | 50% | 67% | 76% | 84% | 89% |
 
-November 2025 has 480 hours because the data starts on 1 Nov 2025, so its first days have less than a full week of residuals.
+November 2025 has 480 hours because the backtest ignores everything before 1 Nov 2025 (the fetched data starts on 15 Oct), so the first days of November have less than a full week of residuals.
 
 ## What it shows
 
 - **P50 is about right** (50% pooled, 43–55% by month).
-- **The higher the confidence, the bigger the shortfall.** Pooled, P80 is met 76% of the time, P90 84% and P95 89%. So a "90% plan" behaves like roughly an 84% plan. This is the same under-stated downside seen in `docs/uncertainty.md`: the actual falls below the band's P10 edge in 15–18% of hours, not 10%.
+- **The higher the confidence, the bigger the shortfall.** Pooled, P80 is met 76% of the time, P90 84% and P95 89%. So a "90% plan" behaves like roughly an 84% plan. This is the same under-stated downside seen in `docs/uncertainty.md`: pooled, the actual falls below the band's P10 edge in 15–17% of hours, not 10% (12–22% month by month).
 - **January is close to the pooled figures,** slightly better at P50–P80 and slightly worse at P90 (82%).
-- **Why:** errors are strongly correlated within a day, so a week of 168 hourly residuals is really about seven day-sized draws. The 95% plan is roughly the 8th-lowest of 168 residuals and can't see a day worse than the worst of the last week. A better-calibrated tail would need a method change, which has to be pre-registered and confirmed on Nov 2026+ data (`docs/data-usage.md`). The 14-day residual window is the most promising candidate (`docs/validation.md`).
+- **Why:** errors are strongly correlated within a day, so a week of 168 hourly residuals is really about seven day-sized draws. The 95% plan sits between the 9th- and 10th-lowest of 168 residuals and can't see a day worse than the worst of the last week. A better-calibrated tail would need a method change, which has to be pre-registered and confirmed on Nov 2026+ data (`docs/data-usage.md`). The 14-day residual window is the most promising candidate (`docs/validation.md`).
 
 ## How the app uses this
 
-The Decision view will show the measured January hit rate next to the chosen confidence level ("in January, wind came in at or above this level in Y% of hours, target C%"), so the desk sees the honest figure, not the nominal one.
+The Decision view shows each level with its measured hit rate: the pooled Nov 2025 – Sep 2026 rate on the confidence cards ("held"), and both the pooled and the January rate in the sentence under the plan. At cutoffs other than 09:00/09:20 the pooled rate was not measured, so the cards show January and say so. The desk sees the measured figure, not the nominal one.
