@@ -23,7 +23,7 @@ A web app for a UK utility's day-ahead power buying team. It answers two questio
 
 - The forecast available at decision time was **too high in 85% of hours**, by +1,746 MW on average. A desk buying against it would have consistently under-bought.
 - **The correction removes ~82% of the bias and cuts typical error by ~32%; it beat the raw forecast on 22 of 31 days.**
-- The over-forecast appears at **every lead time, about 1.5–2 GW, even for hours that had already happened** when the forecast was published (+1.7 GW). So it is mostly not forecasting skill. It is a systematic gap between what WINDFOR forecasts and what FUELHH reports as generated. A likely cause is curtailment or a difference in what each dataset covers (e.g. which wind farms are included). I couldn't confirm this using only these two datasets.
+- The over-forecast appears at **every lead time, about 1.5–2 GW, even for hours that had already happened** when the forecast was published (+1.7 GW). So it is mostly not forecasting skill. It is a systematic gap between what WINDFOR forecasts and what FUELHH reports as generated. The likely cause is curtailment: an outside check with Elexon's accepted bid volumes for wind farms (docs/curtailment-check.md) finds wind was turned down by 1.5 GW on average in January, 87% of the gap. That data is outside the brief, so the app doesn't use it.
 - The gap grows with wind level: about +2.7 GW when the forecast is above 15 GW (still about +1.0 GW after the correction).
 - **The uncertainty band under-covers: the actual fell inside it in 69% of hours, against an 80% target.** See *Limitations*.
 
@@ -149,6 +149,7 @@ Deployed on Vercel as one project using [Vercel Services](https://vercel.com/doc
 
 Outside the app; each analysis runs the app's own logic unchanged on other months.
 
+- **[docs/curtailment-check.md](docs/curtailment-check.md): curtailment explains most of the gap.** Adding accepted wind bid volumes (Elexon BOAV, outside the brief) back to metered output cuts January's bias from +1,746 to +221 MW and MAE from 2,022 to 1,147 MW; at forecasts above 15 GW the gap disappears. 28 Jan stays unexplained.
 - **[docs/correction.md](docs/correction.md): the level-aware correction FAILED its pre-registered test** on the untouched Jan–Oct 2025 data: MAE lower in only 3 of 10 months (the rule needed 8) and |bias| worse in 9 of 10, so the app keeps the simple 7-day ratio. That vault is now spent; [docs/data-usage.md](docs/data-usage.md) records which data has been used, and future changes must be confirmed on Nov 2026+ data.
 - [docs/validation.md](docs/validation.md): on Nov 2025 – Mar 2026 the correction removes 82–102% of the bias and cuts MAE by 10–54% in every month. The band under-covers everywhere (64–73% vs 80%). Against naive references (Nov 2025 – Sep 2026, day-block bootstrap): the correction beats the raw forecast by 30% pooled (95% CI +26% to +34%), with an interval above zero in 10 of 11 months, and both forecasts beat persistence by 42–78%.
 - [docs/error-anatomy.md](docs/error-anatomy.md): across Nov 2025 – Sep 2026 the error is mostly whole-day level, not timing (a per-day level fix would remove 55% of MAE, a time shift 17%). The forecast catches only half of >2 GW ramps.
@@ -158,7 +159,7 @@ Outside the app; each analysis runs the app's own logic unchanged on other month
 
 ## Limitations
 
-- **The band holds the actual in 69% of hours, not 80%.** Errors are strongly correlated within a day, so the trailing week's 168 hourly residuals are really about seven day-sized draws, and the band under-covers when conditions shift between that week and the delivery day. On the worst days the actual fell outside the band in every hour: 2, 11, 21 and 28 Jan. Each was a day when the actual/forecast ratio dropped well below the trailing week's (28 Jan: 0.52 vs 0.87), consistent with curtailment or other output losses changing, though that cause is not confirmed with these two datasets.
+- **The band holds the actual in 69% of hours, not 80%.** Errors are strongly correlated within a day, so the trailing week's 168 hourly residuals are really about seven day-sized draws, and the band under-covers when conditions shift between that week and the delivery day. On the worst days the actual fell outside the band in every hour: 2, 11, 21 and 28 Jan. Each was a day when the actual/forecast ratio dropped well below the trailing week's (28 Jan: 0.52 vs 0.87). The curtailment check (docs/curtailment-check.md) explains most of the miss on 2, 11 and 21 Jan, but not 28 Jan, where output was still only 65% of the forecast after adding curtailed volumes back.
 - **One month.** All app figures are January 2026 only.
 - **Summer run timing.** WINDFOR's run schedule shifts with British Summer Time. In winter the last run before the 09:20 UK cutoff is the 07:30 run; in summer there is no 07:30 run, so the decision uses the 06:30 run, an hour older. This doesn't affect the January app, but it matters if the scope extends into summer.
 
@@ -168,7 +169,7 @@ Outside the app; each analysis runs the app's own logic unchanged on other month
 - Add other renewables and demand forecasts, so the app shows the actual residual volume to buy.
 - Recalibrate the "plan on" levels so a P90 plan holds about 90% of hours (today about 84%, `docs/plan-backtest.md`). This is a method change: it must be pre-registered and confirmed on Nov 2026+ data, because every earlier month has been used, so the app shows the measured hit rates instead.
 - A better-calibrated band. Three reshaped bands failed (docs/uncertainty.md); the most promising lead, a 14-day residual window, is pre-registered for confirmation on Nov 2026+ data (docs/method-candidates.md).
-- Inputs that explain whole-day level errors (curtailment, demand, day type). A simple level-banded ratio failed its test (docs/correction.md).
+- Forecast curtailment directly. Accepted wind bids explain 87% of January's gap (docs/curtailment-check.md), so a constraint or curtailment forecast is the most promising input for whole-day level errors. A simple level-banded ratio failed its test (docs/correction.md).
 - Schedule automatic data refreshes.
 
 ## Use of AI tools

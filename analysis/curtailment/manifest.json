@@ -1,0 +1,13 @@
+{
+  "fetchedAt": "2026-10-24T08:40:56+00:00",
+  "source": "https://data.elexon.co.uk/bmrs/api/v1/balancing/settlement/acceptance/volumes/all/bid/{settlementDate} (BOAV)",
+  "settlementDates": [
+    "2026-01-02",
+    "2026-02-01"
+  ],
+  "windBmUnitsInReference": 239,
+  "windBmUnitsWithBids": 100,
+  "rows": 43463,
+  "file": "boav_wind_bids.csv",
+  "sha256": "5367c5efe13c3ecf1d7e9604f3540218186dc5bb05f0ee04a86ff16beaaca87e"
+}
