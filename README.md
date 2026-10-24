@@ -147,7 +147,7 @@ Deployed on Vercel as one project using [Vercel Services](https://vercel.com/doc
 
 ## Deeper analysis
 
-Outside the app; each analysis runs the app's own logic unchanged on other months.
+Outside the app; each analysis runs the app's own logic unchanged on other months. Every study, its rule and its verdict are listed in [docs/research-log.md](docs/research-log.md).
 
 - **[docs/curtailment-check.md](docs/curtailment-check.md): curtailment explains most of the gap.** Adding accepted wind bid volumes (Elexon BOAV, outside the brief) back to metered output cuts January's bias from +1,746 to +221 MW and MAE from 2,022 to 1,147 MW; at forecasts above 15 GW the gap drops to about zero, slightly overshooting (−263 MW). 28 Jan stays unexplained.
 - **[docs/correction.md](docs/correction.md): the level-aware correction FAILED its pre-registered test** on the untouched Jan–Oct 2025 data: MAE lower in only 3 of 10 months (the rule needed 8) and |bias| worse in 9 of 10, so the app keeps the simple 7-day ratio. That vault is now spent; [docs/data-usage.md](docs/data-usage.md) records which data has been used, and future changes must be confirmed on Nov 2026+ data.
@@ -155,6 +155,7 @@ Outside the app; each analysis runs the app's own logic unchanged on other month
 - [docs/error-anatomy.md](docs/error-anatomy.md): across Nov 2025 – Sep 2026 the error is mostly whole-day level, not timing (a per-day level fix would remove 55% of MAE, a time shift 17%). The forecast catches only half of >2 GW ramps.
 - [docs/plan-backtest.md](docs/plan-backtest.md): the planning volume at each exceedance level is about right at P50 but under-covers in the tail. Across Nov 2025 – Sep 2026 the P90 planning volume had a hit rate of 84% and the P95 volume 89% (January: 82% and 89%).
 - [docs/ml-challenger.md](docs/ml-challenger.md): **a LightGBM quantile challenger was not adoption-worthy** under its pre-registered rule. On October 2026 it had lower MAE (1,383 vs 1,533 MW) and pinball loss, both with intervals that include zero, but its 80% range held the outturn in only 49% of hours.
+- [docs/cqr-2024.md](docs/cqr-2024.md): **LightGBM + CQR confirmed out-of-period on 2024** (one pre-registered run on an unseen year). Its 80% range covered 80.0% of hours, within 75–85% in 10 of 12 months. Pinball loss was 55 MW lower than the current method's [−81, −31]. The app is unchanged; a change would need a Nov 2026+ trial.
 - [docs/cqr.md](docs/cqr.md): **conformal calibration of the LightGBM challenger is promising, unconfirmed (needs Nov 2026+ data).** Its 80% range covered 80% of development hours, against 55% raw and 71% for the current method. Pinball loss was 50 MW lower than the current method's. The monthly coverage rule was met by the bare minimum (8 of 11 months).
 - [docs/cost-backtest.md](docs/cost-backtest.md): the cost-aware exceedance level (illustrative). At £100 short and £30 long per MWh the newsvendor ratio recommends P80, which was also the lowest-cost level pooled over Nov 2025 – Sep 2026. In January P70 cost least, £4.6m below P80. P80 would have cost £67m less than the NESO forecast in January in this backtest, at these assumptions.
 - [docs/uncertainty.md](docs/uncertainty.md): three alternative bands were tested against a rule fixed in advance. None beat the current band on pinball loss, so it is kept.
