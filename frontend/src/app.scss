@@ -157,3 +157,11 @@ $chrome: 48px + $bar;
 // Carbon's own toggle label stays for screen readers; the field label above shows it visually
 .toggle-field .cds--toggle__label-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .toggle-field > .cds--label { margin-bottom: $spacing-03; }
+
+// chart frame: head with toolbar, legend, plot or table; full screen
+.chart-frame { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; background: inherit; }
+.chart-head { display: flex; justify-content: space-between; align-items: flex-start; gap: $spacing-03; }
+.chart-toolbar { display: flex; flex-shrink: 0; margin: -$spacing-02 (-$spacing-03) 0 0; }
+.chart-table { overflow: auto; }
+.chart-frame:fullscreen { padding: $spacing-07; background: var(--cds-layer-01); }
+.chart-frame:fullscreen > [class*="plot"] { flex: 1; height: auto; }

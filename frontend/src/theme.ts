@@ -14,7 +14,7 @@ const LIGHT = {
   grid: "#e0e0e0",      // Carbon gray-20 gridlines (g10)
   axis: "#525252",      // Carbon text-secondary (g10)
   surface: "#ffffff",
-  bandOpacity: 0.14,
+  bandOpacity: 0.2,    // stronger than before, lighter than Carbon Charts, so lines keep contrast
   text: { actual: "#161616", forecast: "#b8461b", adjusted: "#0f62fe", plan: "#9f1853", muted: "#525252" },
 };
 const DARK = {
@@ -26,7 +26,7 @@ const DARK = {
   grid: "#393939",      // Carbon gray-80 gridlines (g100)
   axis: "#c6c6c6",      // Carbon text-secondary (g100)
   surface: "#262626",
-  bandOpacity: 0.18,
+  bandOpacity: 0.26,
   text: { actual: "#f4f4f4", forecast: "#ff8a5c", adjusted: "#78a9ff", plan: "#ff7eb6", muted: "#c6c6c6" },
 };
 export type ChartColors = typeof LIGHT;

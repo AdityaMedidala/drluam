@@ -36,6 +36,12 @@ export const fmtAxisGW = (v: number) => {
   return `${(Number.isInteger(gw) ? gw.toFixed(0) : gw.toFixed(1)).replace("-", "−")} GW`;
 };
 
+/** Plain GW tick numbers (the unit sits once on the axis title): 4000 -> "4", 2500 -> "2.5". */
+export const fmtGWNumber = (mw: number) => {
+  const gw = mw / 1000;
+  return (Number.isInteger(gw) ? gw.toFixed(0) : gw.toFixed(1)).replace("-", "−");
+};
+
 /** Y-axis props: starts at 0 (or the round step below a negative minimum) and ends at the smallest
  *  round value just above the data, with at most six whole-GW steps. */
 export function gwAxis(values: (number | null | undefined)[]) {
@@ -58,7 +64,7 @@ export function gwAxis(values: (number | null | undefined)[]) {
     }
   }
   const ticks = best!.ticks;
-  return { ticks, domain: [ticks[0], ticks[ticks.length - 1]] as [number, number], tickFormatter: fmtAxisGW };
+  return { ticks, domain: [ticks[0], ticks[ticks.length - 1]] as [number, number], tickFormatter: fmtGWNumber };
 }
 /** Whole GWh, for headline sentences. */
 export const fmtGWh0 = (mwh: number | null | undefined) =>

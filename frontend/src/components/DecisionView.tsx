@@ -1,14 +1,12 @@
-import {
-  Accordion, AccordionItem, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tile,
-} from "@carbon/react";
+import { Accordion, AccordionItem, Tile } from "@carbon/react";
 import { useEffect, useMemo, useState } from "react";
-import { Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, CartesianGrid, ComposedChart, Customized, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api, type DayResponse, type DriftResponse, type Meta, type PlanResponse } from "../api";
-import { fmtDateTime, fmtMW, fmtTime, gwAxis } from "../format";
+import { fmtMW, fmtTime, gwAxis } from "../format";
 import { useChartColors } from "../theme";
 import DriftPanel from "./DriftPanel";
 import PlanPanel from "./PlanPanel";
-import { ChartLegend, ChartTooltip, ErrorState, Loading } from "./ui";
+import { ChartFrame, ChartLegend, ChartTooltip, ErrorState, Loading, plotFrame, xAxisProps, yAxisProps, type TableSpec } from "./ui";
 
 /** "What did the desk know when it had to buy?" for one delivery day, fitted to one screen. */
 export default function DecisionView({ meta, cutoff, date, confidence, showActual }: {
@@ -53,11 +51,8 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
       band: p.low != null && p.high != null ? [p.low, p.high] : null,
     })) ?? [];
   }, [data, plan]);
-  // Ticks every 6 h in UK time: readable at phone width and correct on clock-change days.
-  const sixHourTicks = useMemo(
-    () => chartData.map((p) => p.time).filter((t) => ["00:00", "06:00", "12:00", "18:00"].includes(fmtTime(t))),
-    [chartData],
-  );
+  // Hourly ticks in UK time (00:00 … 23:00); Recharts thins them only when they would collide.
+  const hourTicks = useMemo(() => chartData.map((p) => p.time).filter((t) => fmtTime(t).endsWith(":00")), [chartData]);
   // One y-domain for the main chart and the drift chart, from 0 to a round value just above the data.
   const yAxis = useMemo(() => gwAxis([
     ...chartData.flatMap((p) => [p.forecast, p.high, p.plan, showActual ? p.actual : null]),
@@ -74,6 +69,18 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
     ...(hasCorrection ? [{ label: "80% range", color: c.band, kind: "band" as const }] : []),
     ...(showActual ? [{ label: "Outturn", color: c.actual }] : []),
   ];
+  const hourly = chartData.filter((p) => p.forecast != null);
+  const table: TableSpec = {
+    columns: [
+      { label: "Time (UK)" }, { label: "NESO forecast (MW)", numeric: true }, { label: "Bias-corrected (MW)", numeric: true },
+      { label: `P${confidence} planning volume (MW)`, numeric: true },
+      ...(showLow ? [{ label: "80% range low (MW)", numeric: true }] : []), { label: "80% range high (MW)", numeric: true },
+      ...(showActual ? [{ label: "Outturn (MW)", numeric: true }] : []),
+    ],
+    rows: hourly.map((p) => [
+      fmtTime(p.time), p.forecast, p.adjusted, p.plan, ...(showLow ? [p.low] : []), p.high, ...(showActual ? [p.actual] : []),
+    ]),
+  };
 
   return (
     <>
@@ -87,68 +94,29 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
           {error && <ErrorState error={error} />}
           {!data && !error && <Loading height={480} />}
           {data && !error && (
-            <>
-              <h2 className="chart-title">Hourly wind forecast · MW</h2>
-              <p className="sub">Forecasts at decision time, planning volume and 80% range for the delivery day.</p>
-              <ChartLegend items={legend} />
-              <div className="main-plot" role="img" aria-label={`Hourly wind forecast in MW for ${data.date}: NESO forecast, bias-corrected forecast, P${confidence} planning volume and 80% range. Values are in the data table below.`}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-                    <CartesianGrid stroke={c.grid} vertical={false} />
-                    <XAxis dataKey="time" tickFormatter={fmtTime} ticks={sixHourTicks} stroke={c.axis} tickLine={false} fontSize={12} />
-                    <YAxis {...yAxis} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
-                    <Tooltip content={<DayTooltip showActual={showActual} confidence={confidence} c={c} />} />
-                    {hasCorrection && <Area dataKey="band" stroke="none" fill={c.band} fillOpacity={c.bandOpacity} connectNulls isAnimationActive={false} />}
-                    <Line dataKey="forecast" stroke={c.forecast} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
-                    {hasCorrection && <Line dataKey="adjusted" stroke={c.adjusted} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />}
-                    <Line dataKey="plan" stroke={c.plan} strokeWidth={2} strokeDasharray="6 4" dot={false} connectNulls isAnimationActive={false} />
-                    {showActual && <Line dataKey="actual" stroke={c.actual} strokeWidth={1.5} dot={false} isAnimationActive={false} />}
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </>
+            <ChartFrame title="Hourly wind forecast · GW" subtitle="Forecasts at decision time, planning volume and 80% range for the delivery day."
+              legend={<ChartLegend items={legend} />} table={table} fileName={`wind-forecast-${data.date}`} plotClassName="main-plot"
+              ariaLabel={`Hourly wind forecast in GW for ${data.date}: NESO forecast, bias-corrected forecast, P${confidence} planning volume and 80% range. Use Show as table for the values.`}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} accessibilityLayer margin={{ top: 8, right: 16, bottom: 0, left: 4 }}>
+                  <CartesianGrid stroke={c.grid} />
+                  <XAxis dataKey="time" tickFormatter={fmtTime} ticks={hourTicks} interval="equidistantPreserveStart" minTickGap={6} {...xAxisProps(c)} />
+                  <YAxis {...yAxis} {...yAxisProps(c)} />
+                  <Customized component={plotFrame(c)} />
+                  <Tooltip content={<DayTooltip showActual={showActual} confidence={confidence} c={c} />} />
+                  {hasCorrection && <Area dataKey="band" stroke="none" fill={c.band} fillOpacity={c.bandOpacity} connectNulls isAnimationActive={false} />}
+                  <Line dataKey="forecast" stroke={c.forecast} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
+                  {hasCorrection && <Line dataKey="adjusted" stroke={c.adjusted} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />}
+                  <Line dataKey="plan" stroke={c.plan} strokeWidth={2} strokeDasharray="6 4" dot={false} connectNulls isAnimationActive={false} />
+                  {showActual && <Line dataKey="actual" stroke={c.actual} strokeWidth={1.5} dot={false} isAnimationActive={false} />}
+                </ComposedChart>
+              </ResponsiveContainer>
+            </ChartFrame>
           )}
         </Tile>
       </div>
 
       <Accordion className="section-gap">
-        <AccordionItem title="Data tables">
-          {data && (
-            <Table size="sm" aria-label="Hourly forecast for the delivery day, MW" className="num-table">
-              <TableHead><TableRow>
-                <TableHeader>Time (UK)</TableHeader><TableHeader>NESO forecast (MW)</TableHeader><TableHeader>Bias-corrected (MW)</TableHeader>
-                <TableHeader>P{confidence} planning volume (MW)</TableHeader>
-                {showLow && <TableHeader>80% range low (MW)</TableHeader>}<TableHeader>80% range high (MW)</TableHeader>
-                {showActual && <TableHeader>Outturn (MW)</TableHeader>}
-              </TableRow></TableHead>
-              <TableBody>
-                {chartData.filter((p) => p.forecast != null).map((p) => (
-                  <TableRow key={p.time}>
-                    <TableCell>{fmtTime(p.time)}</TableCell><TableCell>{num(p.forecast)}</TableCell><TableCell>{num(p.adjusted)}</TableCell>
-                    <TableCell>{num(p.plan)}</TableCell>{showLow && <TableCell>{num(p.low)}</TableCell>}<TableCell>{num(p.high)}</TableCell>
-                    {showActual && <TableCell>{num(p.actual)}</TableCell>}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-          {drift && (
-            <Table size="sm" aria-label="Forecast runs for the delivery day, GWh" className="num-table section-gap">
-              <TableHead><TableRow>
-                <TableHeader>Run published (UK)</TableHeader><TableHeader>Hours of the day</TableHeader>
-                <TableHeader>Total, common {drift.commonHours} h (GWh)</TableHeader><TableHeader>Day total (GWh)</TableHeader>
-              </TableRow></TableHead>
-              <TableBody>
-                {drift.runs.map((r) => (
-                  <TableRow key={r.publishedUtc}>
-                    <TableCell>{fmtDateTime(r.publishedUtc)}{r.isDecisionRun ? " (decision run)" : ""}</TableCell>
-                    <TableCell>{r.hours.length}</TableCell><TableCell>{gwh(r.commonMWh)}</TableCell><TableCell>{gwh(r.dayMWh)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </AccordionItem>
         <AccordionItem title="Methodology">
           <dl className="methodology">
             <dt>NESO forecast</dt>
@@ -166,7 +134,7 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
             <dt>80% range</dt>
             <dd>Bias-corrected forecast + the 10th–90th percentile of the same hourly errors.</dd>
             <dt>Forecast revisions</dt>
-            <dd>Every WINDFOR run published up to the decision time for this day's hours, compared on the hours all runs cover (D-2 runs end before the last hours). Both charts share one y-axis.</dd>
+            <dd>Every WINDFOR run published up to the decision time for this day's hours, compared on the hours all runs cover (D-2 runs end before the last hours). Both charts share one y-axis. Each chart's toolbar shows its data as a table or downloads it as CSV.</dd>
             <dt>Outturn</dt>
             <dd>FUELHH metered wind generation, half-hourly. Hidden by default so the view shows only information available at decision time.</dd>
             <dt>Curtailment</dt>
@@ -179,9 +147,6 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
     </>
   );
 }
-
-const num = (mw: number | null | undefined) => (mw == null ? "–" : Math.round(mw).toLocaleString("en-GB"));
-const gwh = (mwh: number | null | undefined) => (mwh == null ? "–" : Math.round(mwh / 1000).toLocaleString("en-GB"));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function DayTooltip({ active, payload, showActual, confidence, c }: any) {

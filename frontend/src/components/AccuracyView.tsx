@@ -1,13 +1,13 @@
-import { Accordion, AccordionItem, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tile } from "@carbon/react";
+import { Accordion, AccordionItem, Tile } from "@carbon/react";
 import { useEffect, useState } from "react";
 import {
-  Area, Bar, BarChart, CartesianGrid, ComposedChart, LabelList, Line, LineChart, ReferenceDot, ReferenceLine,
+  Area, Bar, BarChart, CartesianGrid, ComposedChart, Customized, Line, LineChart, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { api, type AccuracyResponse } from "../api";
-import { fmtAxisGW, fmtDate, fmtMW, fmtPct, fmtSignedMW, gwAxis } from "../format";
+import { fmtDate, fmtGWNumber, fmtMW, fmtPct, fmtSignedMW, gwAxis } from "../format";
 import { useChartColors, type ChartColors } from "../theme";
-import { ChartTooltip, ErrorState, Loading, endLabel, lastIndex } from "./ui";
+import { ChartFrame, ChartLegend, ChartTooltip, ErrorState, Loading, plotFrame, xAxisProps, yAxisProps, type TableSpec } from "./ui";
 
 /** "How far can we trust the forecast?" across all January decisions. */
 export default function AccuracyView({ cutoff }: { cutoff: string }) {
@@ -39,35 +39,55 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
     ...d, label: fmtDate(d.deliveryDate), short: fmtDate(d.deliveryDate).split(" ").slice(1).join(" "), gap: [d.actual, d.forecast],
   }));
   const hist = data.histogram.map((b) => ({ ...b, mid: (b.from + b.to) / 2 }));
-  const lastLevel = data.byLevel.length - 1;
+  const pct = (v: number | null | undefined) => (v == null ? null : `${Math.round(v * 100)}%`);
+  const ax = xAxisProps(c);
+  const dailyX = { dataKey: "short", interval: "equidistantPreserveStart" as const, minTickGap: 14, ...ax };
+
+  const tables: Record<string, TableSpec> = {
+    top: { columns: [{ label: "Delivery day" }, { label: "NESO forecast, mean (MW)", numeric: true }, { label: "Outturn, mean (MW)", numeric: true }, { label: "Difference (MW)", numeric: true }],
+      rows: daily.map((d) => [d.label, d.forecast, d.actual, d.forecast - d.actual]) },
+    level: { columns: [{ label: "Forecast level" }, { label: "Hours", numeric: true }, { label: "NESO mean error (MW)", numeric: true }, { label: "Bias-corrected mean error (MW)", numeric: true }],
+      rows: data.byLevel.map((r) => [r.group, r.n, r.errorBias, r.adjErrorBias ?? null]) },
+    calibration: { columns: [{ label: "Exceedance level" }, { label: "Target" }, { label: "Hit rate, January 2026" }, { label: "Hit rate, Nov 2025 – Sep 2026" }],
+      rows: calibration.map((r) => [`P${r.confidence}`, pct(r.target), pct(r.januaryHitRate), pct(r.developmentHitRate)]) },
+    dailyMae: { columns: [{ label: "Delivery day" }, { label: "NESO MAE (MW)", numeric: true }, { label: "Bias-corrected MAE (MW)", numeric: true }],
+      rows: daily.map((d) => [d.label, d.maeRaw, d.maeAdjusted]) },
+    lead: { columns: [{ label: "Lead time" }, { label: "Hours", numeric: true }, { label: "MAE (MW)", numeric: true }, { label: "Mean error (MW)", numeric: true }],
+      rows: data.byHorizon.map((r) => [r.group.startsWith("<0h") ? "elapsed" : r.group, r.n, r.errorMae, r.errorBias]) },
+    hour: { columns: [{ label: "Hour (UK)" }, { label: "NESO MAE (MW)", numeric: true }, { label: "Bias-corrected MAE (MW)", numeric: true }],
+      rows: data.byHour.map((r) => [`${String(r.group).padStart(2, "0")}:00`, r.errorMae, r.adjErrorMae ?? null]) },
+    hist: { columns: [{ label: "Error from (MW)", numeric: true }, { label: "Error to (MW)", numeric: true }, { label: "Hours", numeric: true }],
+      rows: hist.map((b) => [b.from, b.to, b.count]) },
+  };
+  const note = "Use Show as table for the values.";
 
   return (
     <div>
       <Tile className="tile">
-        <h2 className="chart-title">Daily mean wind: forecast vs outturn</h2>
-        <p className="sub">NESO forecast at decision time and metered outturn, daily mean, MW; shading = difference.</p>
-        <div className="acc-top-plot">
+        <ChartFrame title="Daily mean wind: forecast vs outturn · GW" subtitle="NESO forecast at decision time and metered outturn, daily mean."
+          legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast }, { label: "Outturn", color: c.actual }, { label: "Difference", color: c.forecast, kind: "band" }]} />}
+          table={tables.top} fileName="daily-mean-forecast-vs-outturn" plotClassName="acc-top-plot"
+          ariaLabel={`Daily mean NESO forecast and outturn for January, in GW. ${note}`}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={daily} margin={{ top: 8, right: 104, bottom: 0, left: 0 }}>
-              <CartesianGrid stroke={c.grid} vertical={false} />
-              <XAxis dataKey="short" stroke={c.axis} tickLine={false} fontSize={12} interval="preserveStartEnd" minTickGap={32} />
-              <YAxis {...gwAxis(daily.flatMap((d) => [d.forecast, d.actual]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
+            <ComposedChart data={daily} accessibilityLayer margin={{ top: 8, right: 16, bottom: 0, left: 4 }}>
+              <CartesianGrid stroke={c.grid} />
+              <XAxis {...dailyX} />
+              <YAxis {...gwAxis(daily.flatMap((d) => [d.forecast, d.actual]))} {...yAxisProps(c)} />
+              <Customized component={plotFrame(c)} />
               <Tooltip content={({ active, payload }) =>
                 active && payload?.length ? (
                   <ChartTooltip title={payload[0].payload.label} rows={[
                     { label: "NESO forecast", value: fmtMW(payload[0].payload.forecast), color: c.forecast },
                     { label: "Outturn", value: fmtMW(payload[0].payload.actual), color: c.actual },
-                    { label: "Gap", value: fmtSignedMW(payload[0].payload.forecast - payload[0].payload.actual) },
+                    { label: "Difference", value: fmtSignedMW(payload[0].payload.forecast - payload[0].payload.actual) },
                   ]} />
                 ) : null} />
-              <Area dataKey="gap" stroke="none" fill={c.forecast} fillOpacity={0.15} isAnimationActive={false} />
-              <Line dataKey="forecast" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                label={endLabel("NESO forecast", c.text.forecast, daily.length - 1, -6)} />
-              <Line dataKey="actual" stroke={c.actual} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                label={endLabel("Outturn", c.text.actual, daily.length - 1, 10)} />
+              <Area dataKey="gap" stroke="none" fill={c.forecast} fillOpacity={0.18} isAnimationActive={false} />
+              <Line dataKey="forecast" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+              <Line dataKey="actual" stroke={c.actual} strokeWidth={1.5} dot={false} isAnimationActive={false} />
             </ComposedChart>
           </ResponsiveContainer>
-        </div>
+        </ChartFrame>
       </Tile>
 
       <dl className="kpis" aria-label="Headline numbers">
@@ -80,41 +100,39 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
 
       <div className="three">
         <Tile className="tile">
-          <h2 className="chart-title">Mean error by forecast level</h2>
-          <p className="sub">NESO and bias-corrected forecasts by forecast-level bin, MW.</p>
-          <div className="plot">
+          <ChartFrame title="Mean error by forecast level · GW" subtitle="NESO and bias-corrected, by forecast level."
+            legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast, kind: "bar" }, { label: "Bias-corrected forecast", color: c.adjusted, kind: "bar" }]} />}
+            table={tables.level} fileName="mean-error-by-forecast-level" plotClassName="plot" ariaLabel={`Mean error by forecast level, in GW. ${note}`}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.byLevel} barGap={2} margin={{ top: 24, right: 92, bottom: 12, left: 0 }}>
-                <CartesianGrid stroke={c.grid} vertical={false} />
-                <XAxis dataKey="group" tickFormatter={(g: string) => g.replace(" GW", "").replace("-", "–")} stroke={c.axis} tickLine={false} fontSize={12} interval={0}
-                  label={{ value: "Forecast level (GW)", position: "insideBottom", offset: -2, fill: c.axis, fontSize: 12 }} height={40} />
-                <YAxis {...gwAxis(data.byLevel.flatMap((r) => [r.errorBias, r.adjErrorBias]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
+              <BarChart data={data.byLevel} accessibilityLayer barGap={2} margin={{ top: 8, right: 8, bottom: 12, left: 4 }}>
+                <CartesianGrid stroke={c.grid} />
+                <XAxis dataKey="group" tickFormatter={(g: string) => g.replace(" GW", "").replace("-", "–")} interval={0} {...ax}
+                  label={{ value: "Forecast level (GW)", position: "insideBottom", offset: -6, fill: c.axis, fontSize: 12 }} height={40} />
+                <YAxis {...gwAxis(data.byLevel.flatMap((r) => [r.errorBias, r.adjErrorBias]))} {...yAxisProps(c)} />
+                <Customized component={plotFrame(c)} />
                 <ReferenceLine y={0} stroke={c.axis} />
                 <Tooltip cursor={{ fill: c.grid }} content={<GroupTooltip c={c} metric="Bias" />} />
-                <Bar dataKey="errorBias" fill={c.forecast} isAnimationActive={false}>
-                  <LabelList content={barLabel("NESO", c.text.forecast, lastLevel, "end")} />
-                </Bar>
-                <Bar dataKey="adjErrorBias" fill={c.adjusted} isAnimationActive={false}>
-                  <LabelList content={barLabel("Bias-corrected", c.text.adjusted, lastLevel, "start")} />
-                </Bar>
+                <Bar dataKey="errorBias" fill={c.forecast} isAnimationActive={false} />
+                <Bar dataKey="adjErrorBias" fill={c.adjusted} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </ChartFrame>
         </Tile>
 
         <Tile className="tile">
-          <h2 className="chart-title">Exceedance calibration</h2>
-          <p className="sub">Hit rate by exceedance level against its target (dashed).</p>
-          <div className="plot">
+          <ChartFrame title="Exceedance calibration · %" subtitle="Hit rate by exceedance level vs target."
+            legend={<ChartLegend items={[
+              { label: "January 2026", color: c.adjusted }, ...(hasDev ? [{ label: "Nov 2025–Sep 2026", color: c.actual }] : []),
+              { label: "Target", color: c.axis, kind: "dash" as const }]} />}
+            table={tables.calibration} fileName="exceedance-calibration" plotClassName="plot" ariaLabel={`Hit rate by exceedance level against target, in percent. ${note}`}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={calibration} margin={{ top: 8, right: 72, bottom: 0, left: 0 }}>
-                <CartesianGrid stroke={c.grid} vertical={false} />
-                <XAxis type="number" dataKey="target" domain={[0.4, 1]} ticks={[0.5, 0.7, 0.9]} tickFormatter={(v) => fmtPct(v)}
-                  stroke={c.axis} tickLine={false} fontSize={12} />
-                <YAxis type="number" domain={[0.4, 1]} ticks={[0.4, 0.6, 0.8, 1]} tickFormatter={(v) => fmtPct(v)}
-                  stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={44} />
+              <LineChart data={calibration} accessibilityLayer margin={{ top: 8, right: 16, bottom: 12, left: 4 }}>
+                <CartesianGrid stroke={c.grid} />
+                <XAxis type="number" dataKey="target" domain={[0.4, 1]} ticks={[0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]} tickFormatter={(v) => `${Math.round(v * 100)}`} {...ax}
+                  label={{ value: "Target (%)", position: "insideBottom", offset: -6, fill: c.axis, fontSize: 12 }} height={40} />
+                <YAxis type="number" domain={[0.4, 1]} ticks={[0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]} tickFormatter={(v) => `${Math.round(v * 100)}`} {...yAxisProps(c, "Hit rate (%)")} />
+                <Customized component={plotFrame(c)} />
                 <ReferenceLine segment={[{ x: 0.4, y: 0.4 }, { x: 1, y: 1 }]} stroke={c.axis} strokeDasharray="4 4" ifOverflow="hidden" />
-                <ReferenceDot x={0.43} y={0.43} r={0} label={{ value: "Target", position: "right", offset: 8, fill: c.axis, fontSize: 12 }} />
                 <Tooltip content={({ active, payload }) =>
                   active && payload?.length ? (
                     <ChartTooltip title={<>P{payload[0].payload.confidence} · target {fmtPct(payload[0].payload.target)}</>} rows={[
@@ -123,24 +141,23 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                         ? [{ label: "Hit rate, Nov 2025 – Sep 2026", value: fmtPct(payload[0].payload.developmentHitRate), color: c.actual }] : []),
                     ]} />
                   ) : null} />
-                <Line dataKey="januaryHitRate" stroke={c.adjusted} strokeWidth={1.5} dot={{ r: 3 }} isAnimationActive={false}
-                  label={endLabel("January", c.text.adjusted, calibration.length - 1, 12)} />
-                {hasDev && <Line dataKey="developmentHitRate" stroke={c.actual} strokeWidth={1.5} dot={squareDot(c.actual)} isAnimationActive={false}
-                  label={endLabel("Nov–Sep", c.text.actual, calibration.length - 1, -6)} />}
+                <Line dataKey="januaryHitRate" stroke={c.adjusted} strokeWidth={1.5} dot={{ r: 3 }} isAnimationActive={false} />
+                {hasDev && <Line dataKey="developmentHitRate" stroke={c.actual} strokeWidth={1.5} dot={squareDot(c.actual)} isAnimationActive={false} />}
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          </ChartFrame>
         </Tile>
 
         <Tile className="tile">
-          <h2 className="chart-title">Daily MAE</h2>
-          <p className="sub">NESO and bias-corrected forecasts, per delivery day, MW.</p>
-          <div className="plot">
+          <ChartFrame title="Daily MAE · GW" subtitle="NESO and bias-corrected, per delivery day."
+            legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast }, { label: "Bias-corrected forecast", color: c.adjusted }]} />}
+            table={tables.dailyMae} fileName="daily-mae" plotClassName="plot" ariaLabel={`Daily MAE of the NESO and bias-corrected forecasts, in GW. ${note}`}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={daily} margin={{ top: 8, right: 104, bottom: 0, left: 0 }}>
-                <CartesianGrid stroke={c.grid} vertical={false} />
-                <XAxis dataKey="short" stroke={c.axis} tickLine={false} fontSize={12} interval="preserveStartEnd" minTickGap={32} />
-                <YAxis {...gwAxis(daily.flatMap((d) => [d.maeRaw, d.maeAdjusted]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
+              <LineChart data={daily} accessibilityLayer margin={{ top: 8, right: 12, bottom: 0, left: 4 }}>
+                <CartesianGrid stroke={c.grid} />
+                <XAxis {...dailyX} />
+                <YAxis {...gwAxis(daily.flatMap((d) => [d.maeRaw, d.maeAdjusted]))} {...yAxisProps(c)} />
+                <Customized component={plotFrame(c)} />
                 <Tooltip content={({ active, payload }) =>
                   active && payload?.length ? (
                     <ChartTooltip title={payload[0].payload.label} rows={[
@@ -148,86 +165,66 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                       { label: "Bias-corrected MAE", value: fmtMW(payload[0].payload.maeAdjusted), color: c.adjusted },
                     ]} />
                   ) : null} />
-                <Line dataKey="maeRaw" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                  label={endLabel("NESO", c.text.forecast, lastIndex(daily, "maeRaw"), -6)} />
-                <Line dataKey="maeAdjusted" stroke={c.adjusted} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                  label={endLabel("Bias-corrected", c.text.adjusted, lastIndex(daily, "maeAdjusted"), 12)} />
+                <Line dataKey="maeRaw" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                <Line dataKey="maeAdjusted" stroke={c.adjusted} strokeWidth={1.5} dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          </ChartFrame>
         </Tile>
       </div>
 
       <Accordion className="section-gap">
         <AccordionItem title="More diagnostics" open={diagOpen} onHeadingClick={({ isOpen }: { isOpen: boolean }) => setDiagOpen(isOpen)}>
           {diagOpen && <div className="stack">
-            <section>
-              <h2 className="chart-title">MAE and mean error by lead time</h2>
-              <p className="sub">All published NESO forecast runs, MW; "elapsed" = hours already past at publication.</p>
-              <div className="diag-plot">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.byHorizon} margin={{ top: 8, right: 96, bottom: 0, left: 0 }}>
-                    <CartesianGrid stroke={c.grid} vertical={false} />
-                    <XAxis dataKey="group" tickFormatter={(g) => (g.startsWith("<0h") ? "elapsed" : g)} stroke={c.axis} tickLine={false} fontSize={12} />
-                    <YAxis {...gwAxis(data.byHorizon.flatMap((r) => [r.errorMae, r.errorBias]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
-                    <Tooltip content={<GroupTooltip c={c} rawOnly />} />
-                    <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                      label={endLabel("MAE", c.text.forecast, data.byHorizon.length - 1, -6)} />
-                    <Line dataKey="errorBias" stroke={c.forecast} strokeWidth={1.5} strokeDasharray="5 4" dot={false} isAnimationActive={false}
-                      label={endLabel("Mean error", c.text.forecast, data.byHorizon.length - 1, 12)} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </section>
-            <section>
-              <h2 className="chart-title">MAE by hour of day</h2>
-              <p className="sub">NESO and bias-corrected forecasts by delivery hour (UK), MW.</p>
-              <div className="diag-plot">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.byHour} margin={{ top: 8, right: 104, bottom: 0, left: 0 }}>
-                    <CartesianGrid stroke={c.grid} vertical={false} />
-                    <XAxis dataKey="group" tickFormatter={(h) => `${String(h).padStart(2, "0")}:00`} interval={5} stroke={c.axis} tickLine={false} fontSize={12} />
-                    <YAxis {...gwAxis(data.byHour.flatMap((r) => [r.errorMae, r.adjErrorMae]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
-                    <Tooltip content={<GroupTooltip c={c} metric="MAE" hour />} />
-                    <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                      label={endLabel("NESO", c.text.forecast, data.byHour.length - 1, -6)} />
-                    <Line dataKey="adjErrorMae" stroke={c.adjusted} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                      label={endLabel("Bias-corrected", c.text.adjusted, data.byHour.length - 1, 12)} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </section>
-            <section>
-              <h2 className="chart-title">Error distribution (forecast − outturn)</h2>
-              <p className="sub">Hours per 500 MW bin, NESO forecast; positive = over-forecast.</p>
-              <div className="diag-plot">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={hist} barCategoryGap={1} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                    <CartesianGrid stroke={c.grid} vertical={false} />
-                    <XAxis dataKey="mid" tickFormatter={(v) => fmtAxisGW(v)} stroke={c.axis} tickLine={false} fontSize={12} ticks={hist.filter((b) => b.mid % 2000 === 0).map((b) => b.mid)} />
-                    <YAxis stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={36} />
-                    <ReferenceLine x={0} stroke={c.axis} strokeDasharray="3 3" />
-                    <Tooltip cursor={{ fill: c.grid }} content={({ active, payload }) =>
-                      active && payload?.length ? (
-                        <ChartTooltip title={<>{fmtSignedMW(payload[0].payload.from)} to {fmtSignedMW(payload[0].payload.to)}</>}
-                          rows={[{ label: "Hours", value: payload[0].payload.count, color: c.forecast }]} />
-                      ) : null} />
-                    <Bar dataKey="count" fill={c.forecast} isAnimationActive={false} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </section>
-            <Table size="sm" aria-label="Exceedance calibration" className="num-table">
-              <TableHead><TableRow><TableHeader>Exceedance level</TableHeader><TableHeader>Target</TableHeader><TableHeader>Hit rate, January 2026</TableHeader><TableHeader>Hit rate, Nov 2025 – Sep 2026</TableHeader></TableRow></TableHead>
-              <TableBody>
-                {calibration.map((r) => (
-                  <TableRow key={r.confidence}>
-                    <TableCell>P{r.confidence}</TableCell><TableCell>{fmtPct(r.target)}</TableCell>
-                    <TableCell>{fmtPct(r.januaryHitRate)}</TableCell><TableCell>{fmtPct(r.developmentHitRate)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <ChartFrame title="MAE and mean error by lead time · GW" subtitle="All published NESO forecast runs; elapsed = hours already past at publication."
+              legend={<ChartLegend items={[{ label: "MAE", color: c.forecast }, { label: "Mean error", color: c.forecast, kind: "dash" }]} />}
+              table={tables.lead} fileName="error-by-lead-time" plotClassName="diag-plot" ariaLabel={`MAE and mean error by lead time, in GW. ${note}`}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data.byHorizon} accessibilityLayer margin={{ top: 8, right: 16, bottom: 0, left: 4 }}>
+                  <CartesianGrid stroke={c.grid} />
+                  <XAxis dataKey="group" tickFormatter={(g) => (g.startsWith("<0h") ? "elapsed" : g)} interval={0} {...ax} />
+                  <YAxis {...gwAxis(data.byHorizon.flatMap((r) => [r.errorMae, r.errorBias]))} {...yAxisProps(c)} />
+                  <Customized component={plotFrame(c)} />
+                  <Tooltip content={<GroupTooltip c={c} rawOnly />} />
+                  <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                  <Line dataKey="errorBias" stroke={c.forecast} strokeWidth={1.5} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartFrame>
+            <ChartFrame title="MAE by hour of day · GW" subtitle="NESO and bias-corrected forecasts, by delivery hour (UK)."
+              legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast }, { label: "Bias-corrected forecast", color: c.adjusted }]} />}
+              table={tables.hour} fileName="mae-by-hour" plotClassName="diag-plot" ariaLabel={`MAE by hour of day, in GW. ${note}`}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data.byHour} accessibilityLayer margin={{ top: 8, right: 16, bottom: 0, left: 4 }}>
+                  <CartesianGrid stroke={c.grid} />
+                  <XAxis dataKey="group" tickFormatter={(h) => `${String(h).padStart(2, "0")}:00`} interval="equidistantPreserveStart" minTickGap={6} {...ax} />
+                  <YAxis {...gwAxis(data.byHour.flatMap((r) => [r.errorMae, r.adjErrorMae]))} {...yAxisProps(c)} />
+                  <Customized component={plotFrame(c)} />
+                  <Tooltip content={<GroupTooltip c={c} metric="MAE" hour />} />
+                  <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                  <Line dataKey="adjErrorMae" stroke={c.adjusted} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartFrame>
+            <ChartFrame title="Error distribution (forecast − outturn) · hours" subtitle="NESO forecast, 500 MW bins; positive = over-forecast."
+              table={tables.hist} fileName="error-distribution" plotClassName="diag-plot" ariaLabel={`Hours per error bin of the NESO forecast. ${note}`}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={hist} accessibilityLayer barCategoryGap={1} margin={{ top: 8, right: 16, bottom: 12, left: 4 }}>
+                  <CartesianGrid stroke={c.grid} />
+                  <XAxis dataKey="mid" tickFormatter={fmtGWNumber} ticks={hist.filter((b) => b.mid % 1000 === 0).map((b) => b.mid)} interval="equidistantPreserveStart" {...ax}
+                    label={{ value: "Error (GW)", position: "insideBottom", offset: -6, fill: c.axis, fontSize: 12 }} height={40} />
+                  <YAxis {...yAxisProps(c, "Hours")} width={52} />
+                  <Customized component={plotFrame(c)} />
+                  <ReferenceLine x={0} stroke={c.axis} strokeDasharray="3 3" />
+                  <Tooltip cursor={{ fill: c.grid }} content={({ active, payload }) =>
+                    active && payload?.length ? (
+                      <ChartTooltip title={<>{fmtSignedMW(payload[0].payload.from)} to {fmtSignedMW(payload[0].payload.to)}</>}
+                        rows={[{ label: "Hours", value: payload[0].payload.count, color: c.forecast }]} />
+                    ) : null} />
+                  <Bar dataKey="count" fill={c.forecast} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartFrame>
           </div>}
         </AccordionItem>
         <AccordionItem title="Methodology">
@@ -281,10 +278,3 @@ const signedPct = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const squareDot = (fill: string) => ({ cx, cy, index }: any) =>
   cx == null || cy == null ? <g key={index} /> : <rect key={index} x={cx - 3.5} y={cy - 3.5} width={7} height={7} fill={fill} />;
-
-// Names a bar series once, above its bar in one group (replaces a legend).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const barLabel = (text: string, color: string, at: number, anchor: "start" | "end") => (p: any) =>
-  p.index === at
-    ? <text x={anchor === "end" ? p.x + p.width : p.x} y={Math.min(p.y, p.y + p.height) - 6} textAnchor={anchor} fill={color} fontSize={12} fontWeight={500}>{text}</text>
-    : null;

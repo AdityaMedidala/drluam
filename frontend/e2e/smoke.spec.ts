@@ -18,8 +18,8 @@ test("decision view shows the plan, both charts and no errors", async ({ page })
   await page.goto("/?date=2026-01-28&confidence=90&cutoff=09:20");
   await expect(page.getByText("P90 planning volume ·")).toBeVisible();
   await expect(page.locator(".hero")).toContainText("180");
-  await expect(page.getByRole("heading", { name: "Hourly wind forecast · MW" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Forecast revisions to decision time" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Hourly wind forecast · GW" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Forecast revisions to decision time · GW" })).toBeVisible();
   await expect(page.locator(".recharts-surface")).toHaveCount(2);
   // The menu button exists only below Carbon's large breakpoint.
   await expect(page.getByRole("button", { name: "Open menu" })).toBeHidden();
@@ -35,7 +35,7 @@ test("decision view shows the plan, both charts and no errors", async ({ page })
 test("accuracy view shows the headline numbers and three panels", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto("/?view=accuracy&cutoff=09:20");
-  await expect(page.getByRole("heading", { name: "Daily mean wind: forecast vs outturn" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily mean wind: forecast vs outturn · GW" })).toBeVisible();
   await expect(page.locator(".kpis")).toContainText("84% (target 90%)");
   await expect(page.locator(".kpis")).toContainText("2,022 → 1,383 MW");
   await expect(page.locator(".three .tile")).toHaveCount(3);
@@ -60,4 +60,17 @@ test("the delivery-day picker shows the selected date, including the last day", 
   }
   await page.goto("/");
   await expect(page.locator("#delivery-day")).not.toHaveValue("");
+});
+
+test("each chart's toolbar shows its own data table", async ({ page }) => {
+  await page.goto("/?date=2026-01-17&confidence=90");
+  const main = page.locator(".decision .tile").nth(1);
+  await main.getByRole("button", { name: "Show as table" }).click();
+  await expect(main.locator(".chart-table tbody tr")).toHaveCount(24);
+  await expect(main.locator(".chart-table th").first()).toHaveText("Time (UK)");
+  await main.getByRole("button", { name: "Show as chart" }).click();
+  await expect(main.locator(".recharts-surface")).toBeVisible();
+  const download = page.waitForEvent("download");
+  await main.getByRole("button", { name: "Download CSV" }).click();
+  expect((await download).suggestedFilename()).toBe("wind-forecast-2026-01-17.csv");
 });
