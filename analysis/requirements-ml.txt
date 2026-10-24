@@ -1,0 +1,2 @@
+# Analysis-only extras for analysis/ml_challenger.py. Not used by the app; keep out of backend/requirements.txt.
+lightgbm==4.6.0
