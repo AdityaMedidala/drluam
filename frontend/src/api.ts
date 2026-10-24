@@ -5,6 +5,7 @@ export interface Meta {
   firstDelivery: string;
   lastDelivery: string;
   defaultCutoff: string;
+  representativeDelivery: string;   // a typical day (median daily MAE and P90 hit rate)
   cutoffOptions: string[];
   publishSchedule: string[];
 }

@@ -62,7 +62,7 @@ export default function App() {
       const c = readParam("cutoff");
       setCutoff(c && m.cutoffOptions.includes(c) ? c : m.defaultCutoff);
       const d = readParam("date");
-      setDate(d && d >= m.firstDelivery && d <= m.lastDelivery ? d : m.lastDelivery);
+      setDate(d && d >= m.firstDelivery && d <= m.lastDelivery ? d : m.representativeDelivery);
       setMeta(m);
     }).catch((e) => setError(String(e)));
     api.provenance().then(setProv).catch(() => setProv(null));
@@ -81,7 +81,7 @@ export default function App() {
           onClick={() => setNavOpen(!navOpen)} />
         <HeaderName href="#" prefix="">Wind Forecast Desk</HeaderName>
         <HeaderNavigation aria-label="Views">{navItems}</HeaderNavigation>
-        <SideNav aria-label="Views" expanded={navOpen} isPersistent={false} onOverlayClick={() => setNavOpen(false)}>
+        <SideNav aria-label="Views menu" expanded={navOpen} isPersistent={false} onOverlayClick={() => setNavOpen(false)}>
           <SideNavItems><HeaderSideNavItems>{navItems}</HeaderSideNavItems></SideNavItems>
         </SideNav>
         <HeaderGlobalBar>
@@ -93,7 +93,7 @@ export default function App() {
       </Header>
 
       {meta && date && (
-        <div className="control-bar" role="toolbar" aria-label="View controls">
+        <section className="control-bar" aria-label="View controls">
           <div className="page-title">
             {tab === "decision"
               ? <h1>Day-ahead plan · {fmtLongDate(date)}</h1>
@@ -103,7 +103,8 @@ export default function App() {
             <div className="date-group">
               <IconButton kind="ghost" size="md" label="Previous day" disabled={date <= meta.firstDelivery}
                 onClick={() => setDate(shiftDate(date, -1))}><ChevronLeft /></IconButton>
-              <DatePicker datePickerType="single" dateFormat="d/m/Y" value={new Date(`${date}T12:00:00`)}
+              {/* value as a date-only string: a Date at 12:00 on the last day is later than maxDate (00:00) and flatpickr drops it */}
+              <DatePicker datePickerType="single" dateFormat="d/m/Y" value={dmy(date)}
                 minDate={dmy(meta.firstDelivery)} maxDate={dmy(meta.lastDelivery)}
                 onChange={(dates: Date[]) => { if (dates[0]) setDate(isoLocal(dates[0])); }}>
                 <DatePickerInput id="delivery-day" labelText="Delivery day" placeholder="dd/mm/yyyy" size="md" />
@@ -126,11 +127,14 @@ export default function App() {
                   {CONFIDENCES.map((c) => <Switch key={c} name={String(c)} text={`P${c}`} />)}
                 </ContentSwitcher>
               </div>
-              <Toggle id="show-actual" size="sm" labelText="Show outturn" labelA="" labelB=""
+              <div className="toggle-field">
+                <div className="cds--label" aria-hidden="true">Show outturn</div>
+                <Toggle id="show-actual" size="sm" labelText="Show outturn" labelA="" labelB=""
                 toggled={showActual} onToggle={(v: boolean) => setShowActual(v)} />
+              </div>
             </>
           )}
-        </div>
+        </section>
       )}
 
       <main className="page" style={meta ? undefined : { marginTop: 48 }}>
@@ -140,8 +144,8 @@ export default function App() {
           ? <DecisionView meta={meta} cutoff={cutoff} date={date} confidence={confidence} showActual={showActual} />
           : <AccuracyView cutoff={cutoff} />)}
 
-        <footer className="provenance" aria-label="Data provenance">
-          Source: Elexon BMRS (WINDFOR, FUELHH)
+        <footer className="provenance" aria-label="Data source">
+          Source: Elexon BMRS — WINDFOR (NESO wind forecast) and FUELHH (outturn) · decisions January 2026 · decision time {cutoff} UK on D-1
           {prov && <> · snapshot fetched {new Date(prov.fetchedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</>}
           {prov && (prov.allVerified
             ? <> · checksums match</>

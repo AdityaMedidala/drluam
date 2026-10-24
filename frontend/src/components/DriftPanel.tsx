@@ -3,7 +3,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import type { DriftResponse } from "../api";
 import { fmtMW, fmtTime, gwAxis } from "../format";
 import type { ChartColors } from "../theme";
-import { ChartTooltip, ErrorState, Loading, endLabel, lastIndex } from "./ui";
+import { ChartLegend, ChartTooltip, ErrorState, Loading } from "./ui";
 
 /** Compact: how the forecast for this delivery day moved across the runs published up to the cutoff. */
 export default function DriftPanel({ drift, error, c, yAxis }: {
@@ -29,16 +29,15 @@ export default function DriftPanel({ drift, error, c, yAxis }: {
   if (runs.length === 0) return <div className="drift"><p className="label">No forecast runs before the decision time for this day.</p></div>;
 
   const last = runs.length - 1;
-  const change = Math.round((runs[last].commonMWh - runs[0].commonMWh) / 1000);   // GWh, on the common hours
 
   return (
     <section className="drift" aria-label="Forecast drift">
-      <h3 className="chart-title">{change === 0 ? `Forecast unchanged across ${runs.length} runs`
-        : `Forecast revised ${change < 0 ? "down" : "up"} ${Math.abs(change)} GWh across ${runs.length} runs`}</h3>
-      <p className="sub">Common hours: {drift.commonHours} of {runs[last].hours.length}.</p>
-      <div className="drift-plot">
+      <h2 className="chart-title">Forecast revisions to decision time</h2>
+      <p className="sub">{runs.length} NESO forecast runs for this day, MW.</p>
+      <ChartLegend items={[{ label: "Earlier runs", color: c.axis }, { label: "Decision run", color: c.forecast }]} />
+      <div className="drift-plot" role="img" aria-label={`${runs.length} NESO forecast runs for this day, first to decision run; values in the Data tables section.`}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={rows} margin={{ top: 6, right: 84, bottom: 0, left: 0 }}>
+          <LineChart data={rows} margin={{ top: 6, right: 16, bottom: 0, left: 0 }}>
             <CartesianGrid stroke={c.grid} vertical={false} />
             <XAxis dataKey="time" tickFormatter={fmtTime} ticks={ticks} stroke={c.axis} tickLine={false} fontSize={12} />
             <YAxis {...yAxis} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
@@ -53,14 +52,11 @@ export default function DriftPanel({ drift, error, c, yAxis }: {
               <Line key={r.publishedUtc} dataKey={`r${i}`} dot={false} isAnimationActive={false} connectNulls
                 stroke={r.isDecisionRun ? c.forecast : c.axis}
                 strokeWidth={r.isDecisionRun ? 2 : 1}
-                strokeOpacity={r.isDecisionRun ? 1 : 0.2 + 0.45 * (i / Math.max(1, last))}
-                label={i === 0 ? endLabel("First run", c.axis, lastIndex(rows, "r0"), -6)
-                  : r.isDecisionRun ? endLabel("Decision run", c.forecast, lastIndex(rows, `r${i}`), 8) : undefined} />
+                strokeOpacity={r.isDecisionRun ? 1 : 0.2 + 0.45 * (i / Math.max(1, last))} />
             ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <p className="source">Elexon WINDFOR · runs published by {drift.cutoff} D-1</p>
     </section>
   );
 }

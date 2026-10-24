@@ -127,3 +127,33 @@ $chrome: 48px + $bar;
 .control-bar .page-title { flex-shrink: 1; min-width: 0; }
 .control-bar .cds--date-picker.cds--date-picker--single .cds--date-picker__input { width: 9.5rem; }
 .control-bar .cds--content-switcher-btn { min-width: 3.25rem; }
+
+// compact chart legend, top-left
+.chart-legend { display: flex; flex-wrap: wrap; gap: $spacing-02 $spacing-05; margin: 0 0 $spacing-03; padding: 0; list-style: none; font-size: 0.75rem; color: var(--cds-text-secondary); }
+.chart-legend li { display: inline-flex; align-items: center; gap: $spacing-02; }
+.target { font-size: 0.75rem; color: var(--cds-text-secondary); }
+.hero { margin-bottom: $spacing-05; }
+
+// Accuracy KPI row: label / value pairs
+.kpis { display: flex; flex-wrap: wrap; gap: $spacing-05 $spacing-09; margin: $spacing-06 0; }
+.kpis div { display: flex; flex-direction: column; gap: 2px; }
+.kpis dt { font-size: 0.75rem; color: var(--cds-text-secondary); }
+.kpis dd { margin: 0; font-size: 1.25rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kpi-sub { font-size: 0.875rem; color: var(--cds-text-secondary); }
+
+// numeric tables: numbers right-aligned, same width as the charts
+.num-table td:not(:first-child), .num-table th:not(:first-child) .cds--table-header-label { text-align: right; }
+.num-table td { font-variant-numeric: tabular-nums; }
+.cds--accordion__content { padding-inline-end: $spacing-05; }   // Carbon pads 25% on the right; keep right edges flush
+
+// focus ring for keyboard focus only (Carbon draws it on every :focus)
+:focus:not(:focus-visible) { outline: none !important; }
+.cds--content-switcher-btn:focus:not(:focus-visible),
+.cds--date-picker__input:focus:not(:focus-visible),
+.cds--list-box__field:focus:not(:focus-visible) { box-shadow: none !important; }
+// "Show outturn" laid out like the other fields: label on top, control centred in a 40px row
+.toggle-field { display: flex; flex-direction: column; }
+.toggle-field .cds--toggle { display: flex; align-items: center; height: 40px; }
+// Carbon's own toggle label stays for screen readers; the field label above shows it visually
+.toggle-field .cds--toggle__label-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.toggle-field > .cds--label { margin-bottom: $spacing-03; }

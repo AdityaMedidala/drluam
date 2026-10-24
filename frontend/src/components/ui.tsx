@@ -8,7 +8,23 @@ export function withUnit(text: ReactNode): ReactNode {
   return m ? <>{m[1]}<span className="unit">{m[2]}</span></> : text;
 }
 
-export const sourceLine = (cutoff: string) => `Elexon WINDFOR/FUELHH · decisions Jan 2026 · decision time ${cutoff} D-1`;
+/** Compact legend, top-left above a plot: line, dashed-line or band swatches with their labels. */
+export function ChartLegend({ items }: { items: { label: string; color: string; kind?: "line" | "dash" | "band" }[] }) {
+  return (
+    <ul className="chart-legend" aria-label="Legend">
+      {items.map((i) => (
+        <li key={i.label}>
+          <svg width="20" height="10" aria-hidden>
+            {i.kind === "band"
+              ? <rect x="0" y="1" width="20" height="8" fill={i.color} opacity="0.35" />
+              : <line x1="0" y1="5" x2="20" y2="5" stroke={i.color} strokeWidth="2" strokeDasharray={i.kind === "dash" ? "5 3" : undefined} />}
+          </svg>
+          {i.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /** Index of the last row where `key` has a value: where a direct label goes. */
 export function lastIndex(rows: Record<string, unknown>[], key: string): number {

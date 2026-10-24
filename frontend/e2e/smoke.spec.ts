@@ -18,8 +18,8 @@ test("decision view shows the plan, both charts and no errors", async ({ page })
   await page.goto("/?date=2026-01-28&confidence=90&cutoff=09:20");
   await expect(page.getByText("P90 planning volume ·")).toBeVisible();
   await expect(page.locator(".hero")).toContainText("180");
-  await expect(page.getByRole("heading", { name: /below NESO forecast/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /across 11 runs/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Hourly wind forecast · MW" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Forecast revisions to decision time" })).toBeVisible();
   await expect(page.locator(".recharts-surface")).toHaveCount(2);
   // The menu button exists only below Carbon's large breakpoint.
   await expect(page.getByRole("button", { name: "Open menu" })).toBeHidden();
@@ -35,10 +35,12 @@ test("decision view shows the plan, both charts and no errors", async ({ page })
 test("accuracy view shows the headline numbers and three panels", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto("/?view=accuracy&cutoff=09:20");
-  await expect(page.getByRole("heading", { name: "Forecast exceeded outturn on most January days" })).toBeVisible();
-  await expect(page.getByRole("group", { name: "Headline numbers" })).toContainText("84%");
+  await expect(page.getByRole("heading", { name: "Daily mean wind: forecast vs outturn" })).toBeVisible();
+  await expect(page.locator(".kpis")).toContainText("84% (target 90%)");
+  await expect(page.locator(".kpis")).toContainText("2,022 → 1,383 MW");
   await expect(page.locator(".three .tile")).toHaveCount(3);
-  await expect(page.getByRole("group", { name: "Headline numbers" })).not.toContainText("~");
+  await expect(page.locator(".kpis")).not.toContainText("~");
+  await expect(page.getByText(/held/i)).toHaveCount(0);
   expect(await seriousViolations(page)).toEqual([]);
   expect(errors).toEqual([]);
 });
@@ -49,4 +51,13 @@ test("the theme toggle switches to dark and persists", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.reload();
   await expect(page.locator(".cds--g100")).toBeVisible();
+});
+
+test("the delivery-day picker shows the selected date, including the last day", async ({ page }) => {
+  for (const [iso, shown] of [["2026-02-01", "01/02/2026"], ["2026-01-02", "02/01/2026"]]) {
+    await page.goto(`/?date=${iso}`);
+    await expect(page.locator("#delivery-day")).toHaveValue(shown);
+  }
+  await page.goto("/");
+  await expect(page.locator("#delivery-day")).not.toHaveValue("");
 });

@@ -11,8 +11,8 @@ const runTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: UK });
 
 /** The decision: one big number, its delta from the raw forecast, and the few figures behind it. */
-export default function PlanPanel({ plan, day, error, confidence }: {
-  plan: PlanResponse | null; day: DayResponse | null; error: string | null; confidence: number;
+export default function PlanPanel({ plan, day, error, confidence, showActual }: {
+  plan: PlanResponse | null; day: DayResponse | null; error: string | null; confidence: number; showActual: boolean;
 }) {
   if (error) return <ErrorState error={error} />;
   if (!plan) return <Loading height={260} />;
@@ -29,7 +29,6 @@ export default function PlanPanel({ plan, day, error, confidence }: {
     <section aria-label="Plan">
       <div className="label">P{confidence} planning volume · {fmtDate(plan.date)}</div>
       <p className="hero">{Math.round(plan.day.planMWh / 1000).toLocaleString("en-GB")}<span className="unit">GWh</span></p>
-      {extra != null && <p className="delta">{fmtGWh0(Math.abs(extra))} {extra >= 0 ? "below" : "above"} NESO forecast</p>}
       <StructuredListWrapper isCondensed aria-label="Figures behind the plan" className="decision-list">
         <StructuredListBody>
           <StructuredListRow>
@@ -40,6 +39,12 @@ export default function PlanPanel({ plan, day, error, confidence }: {
             <StructuredListCell>Bias-corrected forecast</StructuredListCell>
             <StructuredListCell>{fmtGWh0(plan.day.adjustedMWh)}</StructuredListCell>
           </StructuredListRow>
+          {extra != null && (
+            <StructuredListRow>
+              <StructuredListCell>Δ vs NESO forecast</StructuredListCell>
+              <StructuredListCell>{extra > 0 ? "−" : extra < 0 ? "+" : ""}{fmtGWh0(Math.abs(extra))}</StructuredListCell>
+            </StructuredListRow>
+          )}
           <StructuredListRow>
             <StructuredListCell>
               <DefinitionTooltip openOnHover align="bottom-left"
@@ -49,8 +54,14 @@ export default function PlanPanel({ plan, day, error, confidence }: {
                 P{confidence} hit rate (backtest)
               </DefinitionTooltip>
             </StructuredListCell>
-            <StructuredListCell>{fmtPct(hit)}</StructuredListCell>
+            <StructuredListCell>{fmtPct(hit)} <span className="target">(target {confidence}%)</span></StructuredListCell>
           </StructuredListRow>
+          {showActual && day && (
+            <StructuredListRow>
+              <StructuredListCell>Outturn</StructuredListCell>
+              <StructuredListCell>{fmtGWh0(day.summary.actualEnergyMWh)}</StructuredListCell>
+            </StructuredListRow>
+          )}
         </StructuredListBody>
       </StructuredListWrapper>
       {partial && <p className="warn" role="note">Partial history: {day!.historyPoints} of {day!.historyPointsFull} h in the correction window.</p>}
