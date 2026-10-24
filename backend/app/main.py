@@ -176,6 +176,7 @@ def accuracy(cutoff: str = DEFAULT_CUTOFF):
         "raw": an.error_metrics(f["error"], f["actual"]),
         "comparison": {
             "days": int(both["deliveryDate"].nunique()),
+            "daysAdjustedBetter": int(sum(d["maeAdjusted"] < d["maeRaw"] for d in daily)),
             "raw": an.error_metrics(both["error"], both["actual"]),
             "adjusted": an.error_metrics(both["adjError"], both["actual"]),
         },

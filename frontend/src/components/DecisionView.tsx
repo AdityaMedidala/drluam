@@ -76,7 +76,7 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
             <StatTile tone="accent" label="Expected wind (adjusted)"
               value={hasCorrection ? fmtGWh(data.summary.adjustedEnergyMWh) : "–"}
               sub={hasCorrection
-                ? <>Raw forecast says {fmtGWh(data.summary.forecastEnergyMWh)} — scaled by {data.correctionRatio!.toFixed(2)} after the last 7 days ran high</>
+                ? <>Raw forecast says {fmtGWh(data.summary.forecastEnergyMWh)} — scaled by {data.correctionRatio!.toFixed(2)} because over the last 7 days actual wind came in {fmtPct(Math.abs(1 - data.correctionRatio!))} {data.correctionRatio! < 1 ? "below" : "above"} forecast</>
                 : "Not enough history yet to adjust"}
               note={partialHistory ? `Partial history (${data.historyPoints} of ${data.historyPointsFull} hours): adjustment and band rest on less than a full week` : undefined} />
             <StatTile label="Low case (P10)"

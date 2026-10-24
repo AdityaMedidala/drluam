@@ -14,16 +14,18 @@ A web app for a UK utility's day-ahead power buying team. It answers two questio
 
 | | Raw forecast | Adjusted forecast |
 |---|---|---|
-| Typical hourly error (MAE) | 1,988 MW | 1,385 MW (−30%) |
-| Average bias (forecast − actual) | +1,702 MW | +48 MW |
-| Error as share of output | 17.8% | 12.4% |
+| Typical hourly error (MAE) | 2,022 MW | 1,383 MW (−32%) |
+| Average bias (forecast − actual) | +1,746 MW | +320 MW (~82% removed) |
+| Error as share of output | 17.9% | 12.2% |
+| Hours over-forecast | 85% | 55% |
 
-*Raw vs adjusted is compared over the 30 delivery days with a full week of history. Across all 744 hours, the raw forecast's bias is +1,746 MW.*
+*Raw and adjusted are compared on the same 744 hours (31 delivery days, each with a full week of history).*
 
-- The forecast available at decision time was **too high in 85% of hours**. A desk buying against it would have consistently under-bought.
-- The over-forecast appears at **every lead time, even for hours that had already happened** when the forecast was published. So it is mostly not forecasting skill. It is a systematic gap between what WINDFOR forecasts and what FUELHH reports as generated. A likely cause is curtailment or a difference in what each dataset covers (e.g. which wind farms are included). I couldn't confirm this using only these two datasets.
-- The gap grows with wind level: about +2.7 GW when the forecast is above 15 GW.
-- A simple correction (forecast × last 7 days' actual/forecast ratio, using only data known at the cutoff) removes most of the bias.
+- The forecast available at decision time was **too high in 85% of hours**, by +1,746 MW on average. A desk buying against it would have consistently under-bought.
+- **The correction removes ~82% of the bias and cuts typical error by ~32%; it beat the raw forecast on 22 of 31 days.**
+- The over-forecast appears at **every lead time, about 1.5–2 GW, even for hours that had already happened** when the forecast was published (+1.7 GW). So it is mostly not forecasting skill. It is a systematic gap between what WINDFOR forecasts and what FUELHH reports as generated. A likely cause is curtailment or a difference in what each dataset covers (e.g. which wind farms are included). I couldn't confirm this using only these two datasets.
+- The gap grows with wind level: about +2.7 GW when the forecast is above 15 GW (still about +1.0 GW after the correction).
+- **The uncertainty band under-covers: the actual fell inside it in 69% of hours, against an 80% target.** See *Limitations*.
 
 ## How it works
 
@@ -39,9 +41,13 @@ flowchart LR
 
 **Scope.** "Decisions made in January 2026" means delivery days **2 Jan – 1 Feb 2026**.
 
+**Delivery day.** A delivery day is the UK calendar day (00:00–24:00 Europe/London). GB day-ahead auction products actually run 23:00–23:00 UK; re-running with that definition changed raw bias and MAE by less than 0.2% and adjusted MAE by about 1% (1,383 → 1,369 MW), so the simpler calendar day is kept.
+
 **Time alignment.** WINDFOR is hourly and FUELHH is half-hourly. Accuracy is measured on the hour. Interpolating forecasts to half-hours gave the same results (MAE 2,021 vs 2,022 MW). Charts show actuals at full half-hourly resolution.
 
-**Adjusted forecast and band.** For delivery day D: ratio = Σactual / Σforecast over the previous 7 days of hours whose actuals were already known at the cutoff. Adjusted forecast = forecast × ratio. The band is the adjusted forecast + the P10/P90 of out-of-sample residuals over that same window: for each history hour, actual minus that day's own adjusted forecast (made with its own prior ratio), so the band reflects errors the method really made. In January the actual fell inside the band in 70% of hours at a 09:00 cutoff, not the nominal 80%; the app shows the measured figure. A test checks that nothing from after the cutoff is used.
+**Adjusted forecast and band.** For delivery day D: ratio = Σactual / Σforecast over the previous 7 days of hours whose actuals were already known at the cutoff. Adjusted forecast = forecast × ratio. The band is the adjusted forecast + the P10/P90 of out-of-sample residuals over that same window: for each history hour, actual minus that day's own adjusted forecast (made with its own prior ratio), so the band reflects errors the method really made. In January the actual fell inside the band in 69% of hours at a 09:00 cutoff, not the nominal 80%; the app shows the measured figure. A test checks that nothing from after the cutoff is used.
+
+**When an actual counts as known.** A FUELHH half-hour is treated as known once it has ended (startTime + 30 min ≤ cutoff), i.e. assuming it is published with no lag. The snapshot supports this: 99.8% of half-hours carry a publishTime within 5 minutes of the period end. If Elexon's real availability lagged, the last half-hour or so before the cutoff would drop out of a 168-hour window.
 
 **Error sign.** Error = forecast − actual. Positive means the forecast was too high, i.e. the risk of buying too little.
 
@@ -56,7 +62,7 @@ flowchart LR
 │   │   ├── analysis.py      # core logic: decision-forecast selection, correction, metrics (pure pandas)
 │   │   ├── data.py          # loads the cached CSV snapshot
 │   │   └── main.py          # FastAPI routes
-│   ├── data/                # January 2026 snapshot from Elexon (actuals_wind.csv, forecasts_wind.csv)
+│   ├── data/                # January 2026 snapshot from Elexon (actuals_wind.csv, forecasts_wind.csv, manifest.json)
 │   ├── scripts/
 │   │   ├── fetch_data.py    # pulls WINDFOR + FUELHH from the Elexon API (chunked, with retries)
 │   │   └── explore_data.py  # data profiling: publish schedule, resolution, horizons, first metrics
@@ -124,15 +130,21 @@ Deployed on Vercel as one project using [Vercel Services](https://vercel.com/doc
 ## Design decisions and trade-offs
 
 - **Snapshot instead of live API calls.** The data is fixed history, so a snapshot gives fast, reproducible results. A production version would refresh on a schedule.
-- **Pandas in memory, no database.** About 20k rows. Results are cached per cutoff. A database would add moving parts without benefit at this size.
+- **Pandas in memory, no database.** About 30k rows. Results are cached per cutoff. A database would add moving parts without benefit at this size.
 - **Analysis logic kept free of I/O.** All of it lives in `analysis.py`, so it can be unit-tested directly.
 - **Simple, explainable correction.** A multiplicative trailing ratio was chosen over a fitted model because the client can understand and audit it. A level-dependent correction is a natural next step, since the bias grows with wind level.
+
+## Limitations
+
+- **The band holds the actual in 69% of hours, not 80%.** Errors are strongly correlated within a day, so the trailing week's 168 hourly residuals are really about seven day-sized draws, and the band under-covers when conditions shift between that week and the delivery day. On the worst days the actual fell outside the band in every hour: 2, 11, 21 and 28 Jan. Each was a day when the actual/forecast ratio dropped well below the trailing week's (28 Jan: 0.52 vs 0.87), consistent with curtailment or other output losses changing, though that cause is not confirmed with these two datasets.
+- **One month.** All figures are January 2026 only.
 
 ## Next steps
 
 - Add more months to test whether the bias pattern persists.
 - Add other renewables and demand forecasts, so the app shows the actual residual volume to buy.
-- Use a level-dependent correction and calibrated probabilistic bands.
+- Calibrated bands, chosen only after out-of-sample validation on other months, not tuned on January.
+- A level-dependent correction, since the bias grows with wind level.
 - Schedule automatic data refreshes.
 
 ## Use of AI tools

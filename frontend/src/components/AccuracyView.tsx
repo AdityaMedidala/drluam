@@ -26,6 +26,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
 
   const { raw, comparison: cmp, band } = data;
   const improvement = 1 - cmp.adjusted.mae / cmp.raw.mae;
+  const biasRemoved = 1 - cmp.adjusted.bias / cmp.raw.bias;
   // The "<0h (already elapsed)" bucket holds forecasts published after their hour began.
   const elapsed = data.byHorizon.find((r) => r.group.startsWith("<0h"));
   const ahead = data.byHorizon.filter((r) => r !== elapsed);
@@ -40,17 +41,18 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
       <Insight>
         In January the forecast available at decision time was <strong>too high in {fmtPct(raw.overForecastShare)} of hours</strong>,
         by <strong>{fmtMW(raw.bias)}</strong> on average. A desk buying against the raw forecast would have
-        systematically under-bought. Rescaling by the previous week's track record cuts the typical error
-        by <strong>{fmtPct(improvement)}</strong>.
+        systematically under-bought. Rescaling by the previous week's track record <strong>removes ~{fmtPct(biasRemoved)} of the bias</strong> and
+        cuts the typical error by <strong>~{fmtPct(improvement)}</strong>; it beat the raw forecast on {cmp.daysAdjustedBetter} of {cmp.days} days.
+        Its uncertainty band held the actual in {fmtPct(band.coverage)} of hours, short of the 80% it aims for.
       </Insight>
 
       <div className="tiles">
         <StatTile tone="accent" label="Typical error (MAE)"
           value={<>{fmtMW(cmp.adjusted.mae)}</>}
           sub={<>Adjusted forecast · raw: {fmtMW(cmp.raw.mae)}</>} />
-        <StatTile label="Average bias"
-          value={fmtSignedMW(cmp.adjusted.bias)}
-          sub={<>Adjusted · raw: {fmtSignedMW(cmp.raw.bias)} (+ = forecast too high)</>} />
+        <StatTile label="Bias removed"
+          value={fmtPct(biasRemoved)}
+          sub={<>Average bias: raw {fmtSignedMW(cmp.raw.bias)} → adjusted {fmtSignedMW(cmp.adjusted.bias)} (+ = forecast too high)</>} />
         <StatTile label="Error as share of output"
           value={fmtPct(cmp.adjusted.nmae, 1)}
           sub={<>Adjusted · raw: {fmtPct(cmp.raw.nmae, 1)}</>} />
@@ -62,7 +64,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
           sub="80% of hourly raw-forecast errors fall in this range" />
       </div>
       <p className="footnote">
-        Adjusted vs raw compared over the {cmp.days} delivery days with a week of history; raw-only figures cover all {raw.n} hours,
+        Adjusted vs raw compared on the same {cmp.adjusted.n} hours ({cmp.days} delivery days); raw-only figures cover all {raw.n} hours,
         {" "}{fmtDate(data.period.firstDelivery)} – {fmtDate(data.period.lastDelivery)}. Decision cutoff {data.cutoff} UK on the day before delivery.
       </p>
 

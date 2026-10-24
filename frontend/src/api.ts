@@ -74,7 +74,7 @@ export interface AccuracyResponse {
   cutoff: string;
   period: { firstDelivery: string; lastDelivery: string };
   raw: Metrics;
-  comparison: { days: number; raw: Metrics; adjusted: Metrics };
+  comparison: { days: number; daysAdjustedBetter: number; raw: Metrics; adjusted: Metrics };
   band: BandCoverage;
   byHour: GroupRow[];
   byLevel: GroupRow[];
