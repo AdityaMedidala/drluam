@@ -64,7 +64,7 @@ export default function PlanPanel({ plan, day, error, confidence, showActual }: 
           )}
         </StructuredListBody>
       </StructuredListWrapper>
-      {partial && <p className="warn" role="note">Partial history: {day!.historyPoints} of {day!.historyPointsFull} h in the correction window.</p>}
+      {partial && <p className="warn" role="note">Partial history, {day!.historyPoints} of {day!.historyPointsFull} hours in the correction window.</p>}
       {day?.forecastPublishedUtc && day.horizonHours && (
         <p className="run">NESO forecast run {runTime(day.forecastPublishedUtc)} · {Math.floor(day.horizonHours[0])}–{Math.ceil(day.horizonHours[1])} h ahead</p>
       )}

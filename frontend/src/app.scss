@@ -24,6 +24,7 @@
 @use '@carbon/styles/scss/components/accordion';
 @use '@carbon/styles/scss/components/data-table';
 @use '@carbon/styles/scss/components/popover';
+@use '@carbon/styles/scss/components/overflow-menu';
 @use '@carbon/styles/scss/components/tooltip';
 @use '@carbon/styles/scss/components/notification';
 @use '@carbon/styles/scss/components/skeleton-styles';
@@ -161,7 +162,9 @@ $chrome: 48px + $bar;
 // chart frame: head with toolbar, legend, plot or table; full screen
 .chart-frame { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; background: inherit; }
 .chart-head { display: flex; justify-content: space-between; align-items: flex-start; gap: $spacing-03; }
-.chart-toolbar { display: flex; flex-shrink: 0; margin: -$spacing-02 (-$spacing-03) 0 0; }
+.chart-menu { flex-shrink: 0; margin: -$spacing-02 (-$spacing-03) 0 0; opacity: 0; transition: opacity 110ms; }
+.chart-frame:hover .chart-menu, .chart-frame:focus-within .chart-menu, .chart-menu.cds--overflow-menu--open { opacity: 1; }
+@media (hover: none), (max-width: 671px) { .chart-menu { opacity: 1; } }
 .chart-table { overflow: auto; }
 .chart-frame:fullscreen { padding: $spacing-07; background: var(--cds-layer-01); }
 .chart-frame:fullscreen > [class*="plot"] { flex: 1; height: auto; }

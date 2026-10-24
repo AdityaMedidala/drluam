@@ -34,7 +34,7 @@ export default function DriftPanel({ drift, error, c, yAxis }: {
 
   return (
     <section className="drift" aria-label="Forecast revisions">
-      <ChartFrame title="Forecast revisions to decision time · GW" subtitle={`${runs.length} NESO forecast runs for this day.`}
+      <ChartFrame title="Forecast revisions · GW" subtitle={`${runs.length} runs published by the decision time.`}
         legend={<ChartLegend items={[{ label: "Earlier runs", color: c.axis }, { label: "Decision run", color: c.forecast }]} />}
         table={table} fileName={`forecast-runs-${drift.date}`} plotClassName="drift-plot"
         ariaLabel={`${runs.length} NESO forecast runs for this day, first to decision run. Use Show as table for the values.`}>

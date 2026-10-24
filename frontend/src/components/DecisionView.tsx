@@ -94,7 +94,7 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
           {error && <ErrorState error={error} />}
           {!data && !error && <Loading height={480} />}
           {data && !error && (
-            <ChartFrame title="Hourly wind forecast · GW" subtitle="Forecasts at decision time, planning volume and 80% range for the delivery day."
+            <ChartFrame title="Hourly wind forecast · GW"
               legend={<ChartLegend items={legend} />} table={table} fileName={`wind-forecast-${data.date}`} plotClassName="main-plot"
               ariaLabel={`Hourly wind forecast in GW for ${data.date}: NESO forecast, bias-corrected forecast, P${confidence} planning volume and 80% range. Use Show as table for the values.`}>
               <ResponsiveContainer width="100%" height="100%">
@@ -120,27 +120,29 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
         <AccordionItem title="Methodology">
           <dl className="methodology">
             <dt>NESO forecast</dt>
-            <dd>For each hour, the latest WINDFOR forecast (Elexon BMRS) published at or before the decision time ({cutoff} UK on D-1). Later runs are excluded: they were not available at decision time.</dd>
-            <dt>Forecast run and horizon</dt>
-            <dd>The publication time of that latest run, and its lead time: hours from publication to the first and last delivery hour of the day, rounded outward to whole hours.</dd>
+            <dd>Latest WINDFOR run published by the decision time ({cutoff} UK, D-1). Later runs are excluded.</dd>
+            <dt>Forecast run</dt>
+            <dd>Publication time of that run. Lead time is the hours from publication to the first and last delivery hour.</dd>
             <dt>Bias-corrected forecast</dt>
-            <dd>NESO forecast × the ratio of outturn to forecast over the previous 7 days, using only outturn known at decision time{ratio != null ? <> (this day: {ratio.toFixed(2)})</> : null}.</dd>
+            <dd>NESO forecast scaled by the previous 7 days’ outturn-to-forecast ratio. Only outturn known at decision time is used.{ratio != null ? <> The ratio for this day is {ratio.toFixed(2)}.</> : null}</dd>
             <dt>P{confidence} planning volume</dt>
-            <dd>Each hour's bias-corrected forecast + the {100 - confidence}th percentile of the previous 7 days' hourly errors (outturn − bias-corrected, either sign), floored at 0, summed over the day. At P90 it equals the low edge of the 80% range.</dd>
+            <dd>Hourly bias-corrected forecast plus the {ordinal(100 - confidence)} percentile of the previous 7 days’ hourly errors. Floored at zero and summed over the day.{confidence === 90 ? " Equal to the low edge of the 80% range." : ""}</dd>
             <dt>Δ vs NESO forecast</dt>
-            <dd>Planning volume − NESO forecast, daily energy. Negative = plan for less wind than the NESO forecast.</dd>
-            <dt>Hit rate (backtest)</dt>
-            <dd>Share of hours with outturn at or above the planning volume (target = the exceedance level). Nov 2025 – Sep 2026 (7,775 hours) uses the same method offline and is shown for the 09:00/09:20 decision times only; January 2026 uses this app's data. P90 was missed in 16% of hours (target 10%), P95 in 11% (target 5%): whole-day shortfalls occur more often than the previous week's errors imply. Past performance, not a guarantee.</dd>
+            <dd>Planning volume minus NESO forecast. Negative means plan for less wind.</dd>
+            <dt>Hit rate</dt>
+            <dd>Share of hours with outturn at or above the planning volume. Backtest from Nov 2025 to Sep 2026, 7,775 hours. Past performance, not a guarantee.</dd>
+            <dt>Under-coverage</dt>
+            <dd>P90 missed 16% of hours (target 10%). P95 missed 11% (target 5%). Whole-day shortfalls happen more often than the previous week suggests.</dd>
             <dt>80% range</dt>
-            <dd>Bias-corrected forecast + the 10th–90th percentile of the same hourly errors.</dd>
+            <dd>Bias-corrected forecast plus the 10th to 90th percentile of the same errors.</dd>
             <dt>Forecast revisions</dt>
-            <dd>Every WINDFOR run published up to the decision time for this day's hours, compared on the hours all runs cover (D-2 runs end before the last hours). Both charts share one y-axis. Each chart's toolbar shows its data as a table or downloads it as CSV.</dd>
+            <dd>All runs published before the decision time, compared on the hours every run covers.</dd>
             <dt>Outturn</dt>
-            <dd>FUELHH metered wind generation, half-hourly. Hidden by default so the view shows only information available at decision time.</dd>
+            <dd>FUELHH metered wind generation, half-hourly. Hidden by default.</dd>
             <dt>Curtailment</dt>
-            <dd>Most of the average gap matches wind curtailment (accepted balancing-mechanism bids). This is documented in the project's curtailment analysis, which uses data outside this app.</dd>
+            <dd>Most of the average gap matches accepted balancing-mechanism bids for wind. See the project’s curtailment analysis.</dd>
             <dt>Units and times</dt>
-            <dd>UK local time. Power in MW (hourly values); energy in GWh, whole numbers: hourly MW × 1 h (forecasts), half-hourly MW × 0.5 h (outturn).</dd>
+            <dd>UK local time. Power in MW, energy in GWh.</dd>
           </dl>
         </AccordionItem>
       </Accordion>
@@ -161,3 +163,6 @@ function DayTooltip({ active, payload, showActual, confidence, c }: any) {
   ].filter(Boolean);
   return <ChartTooltip title={`${fmtTime(p.time)} UK`} rows={rows} />;
 }
+
+/** 10 -> "10th", 5 -> "5th", 50 -> "50th", 30 -> "30th", 20 -> "20th". */
+const ordinal = (n: number) => `${n}${n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th"}`;

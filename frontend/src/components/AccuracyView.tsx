@@ -64,7 +64,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
   return (
     <div>
       <Tile className="tile">
-        <ChartFrame title="Daily mean wind: forecast vs outturn · GW" subtitle="NESO forecast at decision time and metered outturn, daily mean."
+        <ChartFrame title="Daily mean wind, forecast vs outturn · GW"
           legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast }, { label: "Outturn", color: c.actual }, { label: "Difference", color: c.forecast, kind: "band" }]} />}
           table={tables.top} fileName="daily-mean-forecast-vs-outturn" plotClassName="acc-top-plot"
           ariaLabel={`Daily mean NESO forecast and outturn for January, in GW. ${note}`}>
@@ -100,7 +100,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
 
       <div className="three">
         <Tile className="tile">
-          <ChartFrame title="Mean error by forecast level · GW" subtitle="NESO and bias-corrected, by forecast level."
+          <ChartFrame title="Mean error by forecast level · GW"
             legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast, kind: "bar" }, { label: "Bias-corrected forecast", color: c.adjusted, kind: "bar" }]} />}
             table={tables.level} fileName="mean-error-by-forecast-level" plotClassName="plot" ariaLabel={`Mean error by forecast level, in GW. ${note}`}>
             <ResponsiveContainer width="100%" height="100%">
@@ -120,7 +120,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
         </Tile>
 
         <Tile className="tile">
-          <ChartFrame title="Exceedance calibration · %" subtitle="Hit rate by exceedance level vs target."
+          <ChartFrame title="Exceedance calibration"
             legend={<ChartLegend items={[
               { label: "January 2026", color: c.adjusted }, ...(hasDev ? [{ label: "Nov 2025–Sep 2026", color: c.actual }] : []),
               { label: "Target", color: c.axis, kind: "dash" as const }]} />}
@@ -149,7 +149,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
         </Tile>
 
         <Tile className="tile">
-          <ChartFrame title="Daily MAE · GW" subtitle="NESO and bias-corrected, per delivery day."
+          <ChartFrame title="Daily MAE · GW"
             legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast }, { label: "Bias-corrected forecast", color: c.adjusted }]} />}
             table={tables.dailyMae} fileName="daily-mae" plotClassName="plot" ariaLabel={`Daily MAE of the NESO and bias-corrected forecasts, in GW. ${note}`}>
             <ResponsiveContainer width="100%" height="100%">
@@ -176,7 +176,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
       <Accordion className="section-gap">
         <AccordionItem title="More diagnostics" open={diagOpen} onHeadingClick={({ isOpen }: { isOpen: boolean }) => setDiagOpen(isOpen)}>
           {diagOpen && <div className="stack">
-            <ChartFrame title="MAE and mean error by lead time · GW" subtitle="All published NESO forecast runs; elapsed = hours already past at publication."
+            <ChartFrame title="MAE and mean error by lead time · GW" subtitle="All published NESO forecast runs, not only decision-time runs."
               legend={<ChartLegend items={[{ label: "MAE", color: c.forecast }, { label: "Mean error", color: c.forecast, kind: "dash" }]} />}
               table={tables.lead} fileName="error-by-lead-time" plotClassName="diag-plot" ariaLabel={`MAE and mean error by lead time, in GW. ${note}`}>
               <ResponsiveContainer width="100%" height="100%">
@@ -191,7 +191,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                 </LineChart>
               </ResponsiveContainer>
             </ChartFrame>
-            <ChartFrame title="MAE by hour of day · GW" subtitle="NESO and bias-corrected forecasts, by delivery hour (UK)."
+            <ChartFrame title="MAE by hour of day · GW"
               legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast }, { label: "Bias-corrected forecast", color: c.adjusted }]} />}
               table={tables.hour} fileName="mae-by-hour" plotClassName="diag-plot" ariaLabel={`MAE by hour of day, in GW. ${note}`}>
               <ResponsiveContainer width="100%" height="100%">
@@ -206,7 +206,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                 </LineChart>
               </ResponsiveContainer>
             </ChartFrame>
-            <ChartFrame title="Error distribution (forecast − outturn) · hours" subtitle="NESO forecast, 500 MW bins; positive = over-forecast."
+            <ChartFrame title="Error distribution (forecast − outturn) · hours" subtitle="NESO forecast in 500 MW bins. Positive values are over-forecasts."
               table={tables.hist} fileName="error-distribution" plotClassName="diag-plot" ariaLabel={`Hours per error bin of the NESO forecast. ${note}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={hist} accessibilityLayer barCategoryGap={1} margin={{ top: 8, right: 16, bottom: 12, left: 4 }}>
@@ -230,27 +230,31 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
         <AccordionItem title="Methodology">
           <dl className="methodology">
             <dt>Period</dt>
-            <dd>Decisions made in January 2026: delivery days {fmtDate(data.period.firstDelivery)} – {fmtDate(data.period.lastDelivery)}, hourly, unless a figure states Nov 2025 – Sep 2026. NESO and bias-corrected forecasts are compared on the same {cmp.adjusted.n} hours.</dd>
+            <dd>Decisions made in January 2026, for delivery days {fmtDate(data.period.firstDelivery)} to {fmtDate(data.period.lastDelivery)}. Hourly data, {cmp.adjusted.n} hours compared.</dd>
             <dt>NESO forecast</dt>
-            <dd>For each delivery hour, the latest WINDFOR forecast (Elexon BMRS) published at or before the decision time ({data.cutoff} UK on D-1).</dd>
+            <dd>Latest WINDFOR run published by the decision time ({data.cutoff} UK, D-1). Later runs are excluded.</dd>
             <dt>Outturn</dt>
             <dd>FUELHH metered wind generation for the same hour.</dd>
-            <dt>Error, mean error</dt>
-            <dd>Error = forecast − outturn; positive = over-forecast, the risk of under-buying. Mean error is its average (bias); the NESO forecast over-forecast in {fmtPct(raw.overForecastShare)} of hours.</dd>
+            <dt>Mean error</dt>
+            <dd>Forecast minus outturn, averaged. Positive means over-forecast, the risk of under-buying. The NESO forecast was too high in {fmtPct(raw.overForecastShare)} of hours.</dd>
             <dt>MAE</dt>
-            <dd>Mean absolute error: the average of |error| over the period, in MW. The % change is 1 − bias-corrected ÷ NESO, for MAE and for mean error.</dd>
+            <dd>Mean absolute error, the average size of the hourly error in MW. The % change compares the bias-corrected forecast with the NESO forecast.</dd>
             <dt>Bias-corrected forecast</dt>
-            <dd>NESO forecast × (outturn ÷ forecast) over the previous 7 days, using only outturn known at decision time. Its daily MAE was lower than the NESO forecast's on {cmp.daysAdjustedBetter} of {cmp.days} days.</dd>
-            <dt>Hit rate (backtest)</dt>
-            <dd>Share of hours with outturn at or above the planning volume at an exceedance level (target = the level). Nov 2025 – Sep 2026 figures use the same method offline (7,775 hours) and are shown for the 09:00/09:20 decision times only.</dd>
-            <dt>80% range coverage</dt>
-            <dd>Share of hours with outturn inside the 80% range: bias-corrected forecast + the 10th–90th percentile of the previous 7 days' errors ({band.n} hours).</dd>
-            <dt>Forecast-level bins</dt>
-            <dd>Hours grouped by the NESO forecast at decision time: below 5 GW, 5–10 GW, 10–15 GW, above 15 GW.</dd>
+            <dd>NESO forecast scaled by the previous 7 days’ outturn-to-forecast ratio. Only outturn known at decision time is used. Its daily MAE was lower on {cmp.daysAdjustedBetter} of {cmp.days} days.</dd>
+            <dt>Hit rate</dt>
+            <dd>Share of hours with outturn at or above the planning volume. Backtest from Nov 2025 to Sep 2026, 7,775 hours. Past performance, not a guarantee.</dd>
+            <dt>Under-coverage</dt>
+            <dd>P90 missed 16% of hours (target 10%). P95 missed 11% (target 5%). Whole-day shortfalls happen more often than the previous week suggests.</dd>
+            <dt>80% range</dt>
+            <dd>Bias-corrected forecast plus the 10th to 90th percentile of the previous 7 days’ errors. Coverage counts {band.n} hours.</dd>
+            <dt>Forecast level</dt>
+            <dd>Hours grouped by the NESO forecast at decision time. Bins are below 5, 5 to 10, 10 to 15 and above 15 GW.</dd>
+            <dt>Lead time</dt>
+            <dd>Hours from a run’s publication to the delivery hour. Elapsed means the hour had already passed.</dd>
             <dt>Curtailment</dt>
-            <dd>Most of the average gap matches wind curtailment (accepted balancing-mechanism bids). This is documented in the project's curtailment analysis, which uses data outside this app.</dd>
-            <dt>Caveat</dt>
-            <dd>All figures are measured on past data: past performance, not a guarantee.</dd>
+            <dd>Most of the average gap matches accepted balancing-mechanism bids for wind. See the project’s curtailment analysis.</dd>
+            <dt>Units and times</dt>
+            <dd>UK local time. Power in MW, energy in GWh.</dd>
           </dl>
         </AccordionItem>
       </Accordion>

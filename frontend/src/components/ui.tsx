@@ -1,7 +1,7 @@
 import {
-  IconButton, InlineNotification, SkeletonPlaceholder, Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  InlineNotification, OverflowMenu, OverflowMenuItem, SkeletonPlaceholder, Table, TableBody, TableCell, TableHead,
+  TableHeader, TableRow,
 } from "@carbon/react";
-import { ChartLine, DataTable, Download, Maximize, Minimize } from "@carbon/icons-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ChartColors } from "../theme";
 
@@ -121,17 +121,12 @@ export function ChartFrame({ title, subtitle, legend, table, fileName, plotClass
           <h2 className="chart-title">{title}</h2>
           {subtitle && <p className="sub">{subtitle}</p>}
         </div>
-        <div className="chart-toolbar" role="toolbar" aria-label={`${title} tools`}>
-          <IconButton kind="ghost" size="sm" align="bottom" label={asTable ? "Show as chart" : "Show as table"} onClick={() => setAsTable(!asTable)}>
-            {asTable ? <ChartLine /> : <DataTable />}
-          </IconButton>
-          <IconButton kind="ghost" size="sm" align="bottom" label={full ? "Exit full screen" : "Full screen"} onClick={toggleFull}>
-            {full ? <Minimize /> : <Maximize />}
-          </IconButton>
-          <IconButton kind="ghost" size="sm" align="bottom-right" label="Download CSV" onClick={() => downloadCsv(fileName, table)}>
-            <Download />
-          </IconButton>
-        </div>
+        {/* One overflow menu per chart: shown on hover or keyboard focus, always on touch and narrow screens. */}
+        <OverflowMenu className="chart-menu" size="sm" flipped aria-label={`${title} options`} iconDescription={`${title} options`}>
+          <OverflowMenuItem itemText={asTable ? "Show as chart" : "Show as table"} onClick={() => setAsTable(!asTable)} />
+          <OverflowMenuItem itemText={full ? "Exit full screen" : "Full screen"} onClick={toggleFull} />
+          <OverflowMenuItem itemText="Download CSV" onClick={() => downloadCsv(fileName, table)} />
+        </OverflowMenu>
       </div>
       {!asTable && legend}
       {asTable ? (

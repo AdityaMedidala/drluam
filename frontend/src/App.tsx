@@ -145,12 +145,11 @@ export default function App() {
           : <AccuracyView cutoff={cutoff} />)}
 
         <footer className="provenance" aria-label="Data source">
-          Source: Elexon BMRS — WINDFOR (NESO wind forecast) and FUELHH (outturn) · decisions January 2026 · decision time {cutoff} UK on D-1
-          {prov && <> · snapshot fetched {new Date(prov.fetchedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</>}
-          {prov && (prov.allVerified
-            ? <> · checksums match</>
-            : <span className="bad"> · checksum mismatch: {prov.files.filter((f) => !f.verified).map((f) => f.file).join(", ")}</span>)}
-          {" "}· times in UK local time
+          Source: Elexon BMRS (WINDFOR, FUELHH).
+          {prov && <> Snapshot {new Date(prov.fetchedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}, {prov.allVerified
+            ? "checksums verified."
+            : <span className="bad">checksum mismatch in {prov.files.filter((f) => !f.verified).map((f) => f.file).join(", ")}.</span>}</>}
+          {" "}UK local time.
         </footer>
       </main>
     </Theme>
