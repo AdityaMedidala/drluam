@@ -6,6 +6,7 @@ Scope: purchase decisions made in January 2026
 
 Usage (from the repo root):
     python backend/scripts/fetch_data.py
+    python backend/scripts/fetch_data.py --first-delivery 2025-11-02 --last-delivery 2026-04-01 --out-dir analysis/data
 
 Writes:
     backend/data/actuals_wind.csv    startTime, settlementDate, settlementPeriod, publishTime, generation
@@ -104,7 +105,9 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--first-delivery", default="2026-01-02")
     p.add_argument("--last-delivery", default="2026-02-01")
+    p.add_argument("--out-dir", type=Path, default=DATA_DIR, help="where to write the CSVs and manifest")
     args = p.parse_args()
+    out_dir = args.out_dir
 
     first = date.fromisoformat(args.first_delivery)
     last = date.fromisoformat(args.last_delivery)
@@ -125,9 +128,9 @@ def main() -> None:
     pub_end = datetime.combine(last, datetime.min.time(), timezone.utc)
     forecasts = fetch_forecasts(pub_start, pub_end)
 
-    DATA_DIR.mkdir(exist_ok=True)
-    actuals.to_csv(DATA_DIR / "actuals_wind.csv", index=False)
-    forecasts.to_csv(DATA_DIR / "forecasts_wind.csv", index=False)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    actuals.to_csv(out_dir / "actuals_wind.csv", index=False)
+    forecasts.to_csv(out_dir / "forecasts_wind.csv", index=False)
     manifest = {
         "fetchedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": BASE,
@@ -146,8 +149,8 @@ def main() -> None:
             "rows": len(forecasts),
         },
     }
-    (DATA_DIR / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    print(f"\nSaved {len(actuals):,} actual rows and {len(forecasts):,} forecast rows to {DATA_DIR}")
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    print(f"\nSaved {len(actuals):,} actual rows and {len(forecasts):,} forecast rows to {out_dir}")
 
 
 if __name__ == "__main__":
