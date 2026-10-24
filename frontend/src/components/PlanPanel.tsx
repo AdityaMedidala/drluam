@@ -19,12 +19,15 @@ export default function PlanPanel({ plan, day, error, confidence, onConfidence }
       <div className="plan-levels" role="radiogroup" aria-label="Planning confidence">
         {CONFIDENCES.map((c) => {
           const r = plan?.calibration.find((x) => x.confidence === c);
-          const held = r?.developmentHitRate ?? r?.januaryHitRate;
+          // "held" is the pooled Nov 2025 – Sep 2026 rate; where it wasn't measured (other cutoffs), say January.
+          const pooled = r?.developmentHitRate != null;
+          const held = pooled ? r?.developmentHitRate : r?.januaryHitRate;
+          const period = pooled ? "Nov 2025 – Sep 2026" : "January 2026";
           return (
             <button key={c} role="radio" aria-checked={c === confidence} onClick={() => onConfidence(c)}
-              aria-label={`P${c}: target ${c}% of hours, held ${fmtPct(held)} of hours`}>
+              aria-label={`P${c}: target ${c}% of hours, held ${fmtPct(held)} of hours in ${period}`} title={`Held in ${period}`}>
               <strong>P{c}</strong>
-              <span className="muted">held {fmtPct(held)}</span>
+              <span className="muted">{pooled ? "held" : "Jan"} {fmtPct(held)}</span>
             </button>
           );
         })}
