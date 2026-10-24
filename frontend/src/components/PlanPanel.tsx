@@ -13,6 +13,13 @@ export default function PlanPanel({ plan, day, error, confidence, onConfidence }
   const extra = plan?.day.extraToProcureMWh;
   const ratio = day?.correctionRatio;
   const partial = day != null && day.historyPoints < day.historyPointsFull;
+  // Miss rate = 1 - hit rate, pooled Nov 2025 - Sep 2026 where measured, else January.
+  const pooledTail = plan?.calibration.every((r) => r.developmentHitRate != null) ?? false;
+  const miss = (c: number) => {
+    const r = plan?.calibration.find((x) => x.confidence === c);
+    const hit = pooledTail ? r?.developmentHitRate : r?.januaryHitRate;
+    return hit == null ? null : 1 - hit;
+  };
 
   return (
     <section className="card plan">
@@ -71,7 +78,9 @@ export default function PlanPanel({ plan, day, error, confidence, onConfidence }
                 ? <><strong>{fmtPct(level.developmentHitRate)}</strong> of hours (Nov 2025–Sep 2026); <strong>{fmtPct(level.januaryHitRate)}</strong> in January.</>
                 : <><strong>{fmtPct(level.januaryHitRate)}</strong> of January hours (target {confidence}%). The Nov 2025–Sep 2026 figure was measured at the 09:00/09:20 cutoffs only.</>}
             </p>
-            <p className="muted">The cautious plans run slightly short because whole-day shortfalls in metered wind output (possibly curtailment, not confirmed) are more frequent than the previous week's errors suggest.</p>
+            <p className="muted">
+              The cautious plans over-promise in the tail: the P90 plan was missed in {fmtPct(miss(90))} of hours (promised 10%) and P95 in {fmtPct(miss(95))} (promised 5%){pooledTail ? "" : " in January"}, because whole-day shortfalls in metered wind output are more frequent than the previous week's errors suggest.
+            </p>
             <details className="table-toggle">
               <summary>How is this calculated?</summary>
               <ul className="plan-method">
