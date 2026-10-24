@@ -79,6 +79,8 @@ flowchart LR
 │   │   └── theme.ts         # chart colours (colour-blind safe, light/dark)
 │   ├── Dockerfile           # build with Node, serve with nginx
 │   └── nginx.conf           # serves the SPA, proxies /api to the backend
+├── analysis/                # out-of-app validation: validate.py + Nov 2025 – Mar 2026 data (not deployed)
+├── docs/validation.md       # validation and sensitivity tables
 ├── docker-compose.yml
 └── vercel.json              # Vercel Services: frontend at /, FastAPI at /api
 ```
@@ -133,6 +135,10 @@ Deployed on Vercel as one project using [Vercel Services](https://vercel.com/doc
 - **Pandas in memory, no database.** About 30k rows. Results are cached per cutoff. A database would add moving parts without benefit at this size.
 - **Analysis logic kept free of I/O.** All of it lives in `analysis.py`, so it can be unit-tested directly.
 - **Simple, explainable correction.** A multiplicative trailing ratio was chosen over a fitted model because the client can understand and audit it. A level-dependent correction is a natural next step, since the bias grows with wind level.
+
+## Validation on other months
+
+The same method, run unchanged on decisions from Nov 2025 to Mar 2026, removes 82–102% of the bias and cuts MAE by 10–54% in every month, and beats a simpler "subtract last week's mean error" baseline every month. The band under-covers in every month (64–73% vs 80%); 14 days of residuals helps everywhere but never reaches 80%. Details and sensitivity tables (ratio window, band window, cutoff, baseline): [docs/validation.md](docs/validation.md).
 
 ## Limitations
 
