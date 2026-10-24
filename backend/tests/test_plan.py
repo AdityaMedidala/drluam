@@ -1,5 +1,6 @@
 """The 'plan on' number: wind we expect to see at least, with C% confidence."""
 from datetime import time
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -99,3 +100,33 @@ def test_accuracy_carries_the_plan_calibration():
     acc = client.get("/api/accuracy").json()["planCalibration"]
     plan = client.get("/api/plan", params={"date": "2026-01-15"}).json()["calibration"]
     assert acc == plan
+
+
+ANALYSIS = Path(__file__).resolve().parents[2] / "analysis"
+DEV_DIRS = [ANALYSIS / "data", ANALYSIS / "data-2026-04-09"]
+
+
+@pytest.mark.skipif(not all((d / "forecasts_wind.csv").exists() for d in DEV_DIRS),
+                    reason="analysis CSVs not present (rebuild with fetch_data.py, see README)")
+def test_dev_hit_rate_constants_match_a_recompute():
+    # Same data and rules as analysis/plan_backtest.py: nothing before 1 Nov 2025,
+    # decision month = D-1 in Nov 2025 - Sep 2026, only hours with 168 residuals.
+    from app.main import DEV_PLAN_HIT_RATES
+    start = pd.Timestamp("2025-11-01", tz="UTC")
+    acts, fcs = [], []
+    for d in DEV_DIRS:
+        a = pd.read_csv(d / "actuals_wind.csv", parse_dates=["startTime"])
+        f = pd.read_csv(d / "forecasts_wind.csv", parse_dates=["publishTime", "startTime"])
+        acts.append(a[["startTime", "generation"]])
+        fcs.append(f)
+    actuals = pd.concat(acts).drop_duplicates("startTime", keep="last")
+    forecasts = pd.concat(fcs).drop_duplicates(["publishTime", "startTime"], keep="last")
+    actuals = actuals[actuals["startTime"] >= start].sort_values("startTime").reset_index(drop=True)
+    forecasts = forecasts[forecasts["publishTime"] >= start].reset_index(drop=True)
+
+    frame = build_decision_frame(forecasts, actuals, time(9, 20))
+    month = (pd.to_datetime(frame["deliveryDate"]) - pd.Timedelta(days=1)).dt.strftime("%Y-%m")
+    scored = frame[(frame["bandPoints"] == 168) & (month >= "2025-11") & (month <= "2026-09")]
+    assert plan_hit_rate(scored, 50)["n"] == 7775
+    for c in PLAN_CONFIDENCES:
+        assert plan_hit_rate(scored, c)["hitRate"] == pytest.approx(DEV_PLAN_HIT_RATES[c], abs=5e-5)
