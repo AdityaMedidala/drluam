@@ -3,7 +3,7 @@ import {
   Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { api, type DayResponse, type Meta } from "../api";
-import { fmtAxisGW, fmtDate, fmtDateTime, fmtGWh, fmtMW, fmtTime, shiftDate } from "../format";
+import { fmtAxisGW, fmtDate, fmtDateTime, fmtGWh, fmtMW, fmtPct, fmtTime, shiftDate } from "../format";
 import { useChartColors } from "../theme";
 import { ChartCard, ErrorState, LegendItem, Loading, StatTile } from "./ui";
 
@@ -31,6 +31,7 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
     [data],
   );
   const hasCorrection = data?.correctionRatio != null;
+  const coverage = data?.bandCoverage != null ? fmtPct(data.bandCoverage) : "–";
 
   return (
     <div className="view">
@@ -77,7 +78,7 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
                 : "Not enough history yet to adjust"} />
             <StatTile label="Low case (P10)"
               value={hasCorrection ? fmtGWh(lowEnergy) : "–"}
-              sub="Cautious floor: every hour at its P10 (hourly P10 = only 10% of recent hours came in lower)" />
+              sub="Cautious floor: every hour at the bottom of its band (the band's P10 of last week's adjusted-forecast errors)" />
             <StatTile label="Peak hour (raw forecast)" value={fmtMW(data.summary.peakForecastMW)} />
             {showActual && (
               <StatTile label="What actually happened"
@@ -88,11 +89,11 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
 
           <ChartCard wide
             title="National wind generation forecast"
-            subtitle="Forecast available at decision time, hourly · band = adjusted forecast ± the last 7 days' error range (P10–P90)"
+            subtitle={<>Forecast available at decision time, hourly · band = adjusted forecast + P10–P90 of the last 7 days' adjusted-forecast errors · in January the actual landed inside it in <strong>{coverage}</strong> of hours (not 80%)</>}
             legend={<>
               <LegendItem color={c.forecast} label="Raw forecast" />
               {hasCorrection && <LegendItem color={c.adjusted} label="Adjusted forecast" />}
-              {hasCorrection && <LegendItem color={c.band} label="P10–P90 range" band />}
+              {hasCorrection && <LegendItem color={c.band} label={`Band (held ${coverage} of hours)`} band />}
               {showActual && <LegendItem color={c.actual} label="Actual (half-hourly)" />}
             </>}>
             <div className="chart-lg">

@@ -73,29 +73,44 @@ def build_decision_frame(
 
     Adjusted forecast: raw forecast x ratio (sum actual / sum forecast) over the
     previous `trailing_days` of hours whose actuals were already known at the
-    decision cutoff (half-hour ended, i.e. startTime + 30 min <= cutoff). Band: adjusted forecast + P10 / P90 of the residuals over
-    that same history. No information from after the cutoff is used.
+    decision cutoff (half-hour ended, i.e. startTime + 30 min <= cutoff).
+
+    Band: adjusted forecast + P10 / P90 of OUT-OF-SAMPLE residuals over the same
+    window -- for each history hour, actual minus that day's own adjusted forecast
+    (made with that day's own prior ratio), i.e. the errors the method really made.
+    No information from after the cutoff is used.
     """
     frame = select_decision_forecast(forecasts, cutoff)
     frame = frame.merge(actuals[["startTime", "generation"]], on="startTime", how="left")
     frame = frame.rename(columns={"generation": "actual"}).sort_values("startTime").reset_index(drop=True)
 
-    known = frame.dropna(subset=["actual"])
+    day_cutoffs = frame.groupby("deliveryDate")["cutoffUtc"].first()
     # A FUELHH half-hour is only known once it has ended (publication lag assumed ~0).
-    known_at = known["startTime"] + ACTUAL_PERIOD
-    per_day = []
-    for day, cutoff_utc in frame.groupby("deliveryDate")["cutoffUtc"].first().items():
-        hist = known[(known_at <= cutoff_utc) & (known_at > cutoff_utc - pd.Timedelta(days=trailing_days))]
-        if len(hist) < MIN_HISTORY_POINTS:
-            per_day.append((day, np.nan, np.nan, np.nan, len(hist)))
-            continue
-        ratio = hist["actual"].sum() / hist["forecast"].sum()
-        residuals = hist["actual"] - ratio * hist["forecast"]
-        per_day.append((day, ratio, residuals.quantile(0.1), residuals.quantile(0.9), len(hist)))
+    known_at = frame["startTime"] + ACTUAL_PERIOD
+    has_actual = frame["actual"].notna()
 
-    corr = pd.DataFrame(per_day, columns=["deliveryDate", "ratio", "resP10", "resP90", "historyPoints"])
-    frame = frame.merge(corr, on="deliveryDate", how="left")
+    def history(cutoff_utc):
+        return has_actual & (known_at <= cutoff_utc) & (known_at > cutoff_utc - pd.Timedelta(days=trailing_days))
+
+    # Pass 1: each day's ratio from its own trailing window.
+    ratios = []
+    for day, cutoff_utc in day_cutoffs.items():
+        hist = frame[history(cutoff_utc)]
+        ratio = hist["actual"].sum() / hist["forecast"].sum() if len(hist) >= MIN_HISTORY_POINTS else np.nan
+        ratios.append((day, ratio, len(hist)))
+    frame = frame.merge(pd.DataFrame(ratios, columns=["deliveryDate", "ratio", "historyPoints"]), on="deliveryDate", how="left")
     frame["adjusted"] = frame["forecast"] * frame["ratio"]
+
+    # Pass 2: band from the residuals of those earlier, genuinely out-of-sample adjusted forecasts.
+    residual = frame["actual"] - frame["adjusted"]
+    bands = []
+    for day, cutoff_utc in day_cutoffs.items():
+        res = residual[history(cutoff_utc)].dropna()
+        if len(res) >= MIN_HISTORY_POINTS:
+            bands.append((day, res.quantile(0.1), res.quantile(0.9), len(res)))
+        else:
+            bands.append((day, np.nan, np.nan, len(res)))
+    frame = frame.merge(pd.DataFrame(bands, columns=["deliveryDate", "resP10", "resP90", "bandPoints"]), on="deliveryDate", how="left")
     frame["low"] = frame["adjusted"] + frame["resP10"]
     frame["high"] = frame["adjusted"] + frame["resP90"]
     frame["error"] = frame["forecast"] - frame["actual"]            # +ve = over-forecast
@@ -150,6 +165,21 @@ def horizon_metrics(forecasts: pd.DataFrame, actuals: pd.DataFrame, first_day, l
     labels = [f"{a}-{b}h" for a, b in zip(bins[:-1], bins[1:])]
     m["bucket"] = pd.cut(m["horizon"], bins=list(bins), labels=labels, right=False)
     return grouped_metrics(m.dropna(subset=["bucket"]), m["bucket"], error_cols=("error",))
+
+
+def band_coverage(frame: pd.DataFrame) -> dict:
+    """How often the actual landed inside the P10-P90 band (nominally 80%)."""
+    f = frame.dropna(subset=["actual", "low", "high"])
+    if f.empty:
+        return {"n": 0}
+    return {
+        "n": int(len(f)),
+        "nominal": 0.8,
+        "coverage": float(((f["actual"] >= f["low"]) & (f["actual"] <= f["high"])).mean()),
+        "below": float((f["actual"] < f["low"]).mean()),
+        "above": float((f["actual"] > f["high"]).mean()),
+        "meanWidth": float((f["high"] - f["low"]).mean()),
+    }
 
 
 def error_histogram(error: pd.Series, width: int = 500) -> list[dict]:

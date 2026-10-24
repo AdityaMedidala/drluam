@@ -41,7 +41,7 @@ flowchart LR
 
 **Time alignment.** WINDFOR is hourly and FUELHH is half-hourly. Accuracy is measured on the hour. Interpolating forecasts to half-hours gave the same results (MAE 2,021 vs 2,022 MW). Charts show actuals at full half-hourly resolution.
 
-**Adjusted forecast and band.** For delivery day D: ratio = Σactual / Σforecast over the previous 7 days of hours whose actuals were already known at the cutoff. Adjusted forecast = forecast × ratio. The band is the adjusted forecast + the P10/P90 of the residuals over that same window. A test checks that nothing from after the cutoff is used.
+**Adjusted forecast and band.** For delivery day D: ratio = Σactual / Σforecast over the previous 7 days of hours whose actuals were already known at the cutoff. Adjusted forecast = forecast × ratio. The band is the adjusted forecast + the P10/P90 of out-of-sample residuals over that same window: for each history hour, actual minus that day's own adjusted forecast (made with its own prior ratio), so the band reflects errors the method really made. In January the actual fell inside the band in 70% of hours at a 09:00 cutoff, not the nominal 80%; the app shows the measured figure. A test checks that nothing from after the cutoff is used.
 
 **Error sign.** Error = forecast − actual. Positive means the forecast was too high, i.e. the risk of buying too little.
 

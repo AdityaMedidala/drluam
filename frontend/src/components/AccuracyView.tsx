@@ -24,7 +24,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
   if (error) return <ErrorState error={error} />;
   if (!data) return <Loading />;
 
-  const { raw, comparison: cmp } = data;
+  const { raw, comparison: cmp, band } = data;
   const improvement = 1 - cmp.adjusted.mae / cmp.raw.mae;
   const near = data.byHorizon[0];
   const far = data.byHorizon[data.byHorizon.length - 1];
@@ -51,6 +51,9 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
         <StatTile label="Error as share of output"
           value={fmtPct(cmp.adjusted.nmae, 1)}
           sub={<>Adjusted · raw: {fmtPct(cmp.raw.nmae, 1)}</>} />
+        <StatTile label="Band coverage"
+          value={fmtPct(band.coverage)}
+          sub={<>Hours the actual fell inside the P10–P90 band (aim 80%) · {fmtPct(band.below)} below, {fmtPct(band.above)} above · avg width {fmtMW(band.meanWidth)}</>} />
         <StatTile label="Raw error range (P10 – P90)"
           value={<>{fmtSignedMW(raw.p10)} to {fmtSignedMW(raw.p90)}</>}
           sub="80% of hourly raw-forecast errors fall in this range" />
@@ -172,6 +175,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
           <li><strong>Forecast used:</strong> for each delivery hour, the latest Elexon WINDFOR forecast published before the decision cutoff ({data.cutoff} UK the day before). Later forecasts are ignored — the desk couldn't have seen them in time.</li>
           <li><strong>Actual:</strong> Elexon FUELHH wind generation for the same hour.</li>
           <li><strong>Adjusted forecast:</strong> raw forecast × (actual ÷ forecast) over the previous 7 days, using only actuals already known at the cutoff.</li>
+          <li><strong>Band:</strong> adjusted forecast + the 10th–90th percentile of the errors the adjusted forecast actually made over the previous 7 days (each of those days adjusted with its own prior week). Measured coverage: {fmtPct(band.coverage)} of {band.n} hours.</li>
           <li><strong>Error</strong> = forecast − actual. Positive means the forecast was too high, i.e. the risk of buying too little.</li>
         </ul>
       </section>

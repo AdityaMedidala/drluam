@@ -1,5 +1,6 @@
 from datetime import time
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -101,3 +102,45 @@ def test_error_metrics_sign_and_values():
     assert round(m["mae"], 6) == round(500 / 3, 6)
     assert round(m["nmae"], 6) == round(500 / 3 / 1000, 6)
     assert round(m["overForecastShare"], 6) == round(2 / 3, 6)
+
+
+def test_band_uses_out_of_sample_errors_from_each_days_own_adjusted_forecast():
+    # 20 days of noisy hourly data, forecast published 2 days ahead (09:00 cutoff, GMT).
+    rng = np.random.default_rng(0)
+    times = _hourly("2026-01-01T00:00", 20 * 24)
+    fc = rng.uniform(5_000, 15_000, len(times))
+    act = fc * rng.uniform(0.6, 1.1, len(times))
+    forecasts = pd.DataFrame({"publishTime": times - pd.Timedelta(hours=48), "startTime": times, "generation": fc})
+    actuals = pd.DataFrame({"startTime": times, "generation": act})
+    frame = build_decision_frame(forecasts, actuals, time(9, 0))
+
+    # Naive reference: each day's ratio from its own trailing week of known hours ...
+    f, a = pd.Series(fc, index=times), pd.Series(act, index=times)
+    days = sorted({t.date() for t in times})
+
+    def window(day):
+        cutoff = pd.Timestamp(day, tz="UTC") - pd.Timedelta(days=1) + pd.Timedelta(hours=9)
+        known_at = times + pd.Timedelta(minutes=30)
+        return times[(known_at <= cutoff) & (known_at > cutoff - pd.Timedelta(days=7))]
+
+    ratio = {}
+    for d in days:
+        w = window(d)
+        if len(w) >= 24:
+            ratio[d] = a[w].sum() / f[w].sum()
+
+    # ... and the band for day D from the errors those earlier adjusted forecasts actually made.
+    target = pd.Timestamp("2026-01-18").date()
+    w = [t for t in window(target) if t.date() in ratio]
+    residuals = pd.Series([a[t] - ratio[t.date()] * f[t] for t in w])
+    row = frame[frame.startTime == pd.Timestamp("2026-01-18T12:00Z")].iloc[0]
+    assert row.adjusted == pytest.approx(ratio[target] * f[row.startTime])
+    assert row.low == pytest.approx(row.adjusted + residuals.quantile(0.1))
+    assert row.high == pytest.approx(row.adjusted + residuals.quantile(0.9))
+
+
+def test_band_coverage_counts_actuals_inside_band():
+    from app.analysis import band_coverage
+    f = pd.DataFrame({"actual": [5.0, 0.0, 20.0, 10.0], "low": [0.0] * 4, "high": [10.0] * 4})
+    m = band_coverage(f)
+    assert (m["n"], m["coverage"], m["below"], m["above"]) == (4, 0.75, 0.0, 0.25)

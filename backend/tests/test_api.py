@@ -36,3 +36,11 @@ def test_accuracy_shape():
     assert body["raw"]["n"] > 700
     assert len(body["byHour"]) == 24
     assert body["comparison"]["adjusted"]["mae"] < body["comparison"]["raw"]["mae"]
+
+
+def test_accuracy_reports_band_coverage():
+    band = client.get("/api/accuracy").json()["band"]
+    assert band["n"] > 700 and 0 < band["coverage"] < 1
+    assert abs(band["coverage"] + band["below"] + band["above"] - 1) < 1e-3
+    day = client.get("/api/day", params={"date": "2026-01-15"}).json()
+    assert day["bandCoverage"] == band["coverage"]

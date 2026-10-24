@@ -26,6 +26,7 @@ export interface DayResponse {
   horizonHours: [number, number] | null;
   correctionRatio: number | null;
   historyPoints: number;
+  bandCoverage: number | null;   // share of all in-scope hours whose actual fell inside the band
   summary: {
     forecastEnergyMWh: number;
     adjustedEnergyMWh: number | null;
@@ -50,6 +51,15 @@ export interface Metrics {
   overForecastShare: number;
 }
 
+export interface BandCoverage {
+  n: number;
+  nominal?: number;
+  coverage?: number;
+  below?: number;
+  above?: number;
+  meanWidth?: number;
+}
+
 export interface GroupRow {
   group: string;
   n: number;
@@ -64,6 +74,7 @@ export interface AccuracyResponse {
   period: { firstDelivery: string; lastDelivery: string };
   raw: Metrics;
   comparison: { days: number; raw: Metrics; adjusted: Metrics };
+  band: BandCoverage;
   byHour: GroupRow[];
   byLevel: GroupRow[];
   byHorizon: GroupRow[];
