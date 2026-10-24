@@ -144,3 +144,19 @@ def test_band_coverage_counts_actuals_inside_band():
     f = pd.DataFrame({"actual": [5.0, 0.0, 20.0, 10.0], "low": [0.0] * 4, "high": [10.0] * 4})
     m = band_coverage(f)
     assert (m["n"], m["coverage"], m["below"], m["above"]) == (4, 0.75, 0.0, 0.25)
+
+
+def test_horizon_metrics_has_bucket_for_already_elapsed_hours():
+    from app.analysis import horizon_metrics
+    t = pd.Timestamp("2026-01-10T12:00Z")
+    forecasts = pd.DataFrame({
+        "publishTime": [t + pd.Timedelta(hours=2), t - pd.Timedelta(hours=3)],  # published after / before the hour
+        "startTime": [t, t],
+        "generation": [150.0, 300.0],
+    })
+    actuals = pd.DataFrame({"startTime": [t], "generation": [100.0]})
+    rows = horizon_metrics(forecasts, actuals, t.date(), t.date())
+    by = {r["group"]: r for r in rows}
+    assert rows[0]["group"] == "<0h (already elapsed)"
+    assert by["<0h (already elapsed)"]["errorBias"] == 50.0
+    assert by["0-6h"]["errorBias"] == 200.0

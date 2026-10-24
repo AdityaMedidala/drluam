@@ -154,16 +154,24 @@ def grouped_metrics(df: pd.DataFrame, by: pd.Series, error_cols=("error", "adjEr
     return rows
 
 
+ELAPSED_LABEL = "<0h (already elapsed)"
+
+
 def horizon_metrics(forecasts: pd.DataFrame, actuals: pd.DataFrame, first_day, last_day,
                     bins=(0, 6, 12, 18, 24, 30, 36, 42, 48)) -> list[dict]:
-    """Error of ALL forecasts (not just decision ones) by lead time -- does it shrink closer to delivery?"""
+    """Error of ALL forecasts (not just decision ones) by lead time -- does it shrink closer to delivery?
+
+    Rows published after their target hour started (negative lead time) go in a
+    separate "<0h (already elapsed)" bucket: they show the bias persists even
+    for hours that have already happened.
+    """
     m = forecasts.merge(actuals[["startTime", "generation"]], on="startTime", suffixes=("", "Actual"))
     m["deliveryDate"] = m["startTime"].dt.tz_convert(UK_TZ).dt.date
     m = in_scope(m, first_day, last_day)
     m["horizon"] = (m["startTime"] - m["publishTime"]).dt.total_seconds() / 3600
     m["error"] = m["generation"] - m["generationActual"]
-    labels = [f"{a}-{b}h" for a, b in zip(bins[:-1], bins[1:])]
-    m["bucket"] = pd.cut(m["horizon"], bins=list(bins), labels=labels, right=False)
+    labels = [ELAPSED_LABEL] + [f"{a}-{b}h" for a, b in zip(bins[:-1], bins[1:])]
+    m["bucket"] = pd.cut(m["horizon"], bins=[-np.inf, *bins], labels=labels, right=False)
     return grouped_metrics(m.dropna(subset=["bucket"]), m["bucket"], error_cols=("error",))
 
 

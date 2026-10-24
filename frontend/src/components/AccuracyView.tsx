@@ -26,8 +26,11 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
 
   const { raw, comparison: cmp, band } = data;
   const improvement = 1 - cmp.adjusted.mae / cmp.raw.mae;
-  const near = data.byHorizon[0];
-  const far = data.byHorizon[data.byHorizon.length - 1];
+  // The "<0h (already elapsed)" bucket holds forecasts published after their hour began.
+  const elapsed = data.byHorizon.find((r) => r.group.startsWith("<0h"));
+  const ahead = data.byHorizon.filter((r) => r !== elapsed);
+  const near = ahead[0];
+  const far = ahead[ahead.length - 1];
   const windiest = data.byLevel[data.byLevel.length - 1];
   const hist = data.histogram.map((b) => ({ ...b, mid: (b.from + b.to) / 2 }));
   const daily = data.daily.map((d) => ({ ...d, label: fmtDate(d.deliveryDate) }));
@@ -88,14 +91,14 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
         </ChartCard>
 
         <ChartCard title="Error by lead time"
-          subtitle={<>All published forecasts · typical error grows from {fmtMW(near.errorMae)} at {near.group} to {fmtMW(far.errorMae)} at {far.group} — but even the freshest forecasts run {fmtSignedMW(near.errorBias)} high</>}
+          subtitle={<>All published forecasts · typical error grows from {fmtMW(near.errorMae)} at {near.group} to {fmtMW(far.errorMae)} at {far.group} — but even the freshest forecasts run {fmtSignedMW(near.errorBias)} high{elapsed && <>, and so do forecasts for hours that had <strong>already elapsed</strong> when published ({fmtSignedMW(elapsed.errorBias)}, leftmost point)</>}</>}
           legend={<><LegendItem color={c.forecast} label="Typical error (MAE)" /><LegendItem color={c.forecast} label="Bias" dashed /></>}
         >
           <div className="chart-md">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data.byHorizon} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke={c.grid} vertical={false} />
-                <XAxis dataKey="group" stroke={c.axis} tickLine={false} fontSize={12} />
+                <XAxis dataKey="group" tickFormatter={(g) => (g.startsWith("<0h") ? "elapsed" : g)} stroke={c.axis} tickLine={false} fontSize={12} />
                 <YAxis tickFormatter={fmtAxisGW} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} domain={[0, "auto"]} />
                 <Tooltip content={<GroupTooltip c={c} rawOnly />} />
                 <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
