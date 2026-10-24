@@ -3,6 +3,7 @@ import { api, type Meta } from "./api";
 import AccuracyView from "./components/AccuracyView";
 import DecisionView from "./components/DecisionView";
 import { ErrorState, Loading } from "./components/ui";
+import { readParam, writeParam } from "./url";
 
 // GB day-ahead auction gate closures (UK time).
 const GATES: Record<string, string> = { "09:20": "EPEX gate", "09:50": "N2EX gate" };
@@ -16,8 +17,13 @@ export default function App() {
   const [cutoff, setCutoff] = useState("09:20");
 
   useEffect(() => {
-    api.meta().then((m) => { setMeta(m); setCutoff(m.defaultCutoff); }).catch((e) => setError(String(e)));
+    api.meta().then((m) => {
+      const fromUrl = readParam("cutoff");
+      setCutoff(fromUrl && m.cutoffOptions.includes(fromUrl) ? fromUrl : m.defaultCutoff);
+      setMeta(m);
+    }).catch((e) => setError(String(e)));
   }, []);
+  useEffect(() => { if (meta) writeParam("cutoff", cutoff); }, [meta, cutoff]);
 
   return (
     <div className="app">

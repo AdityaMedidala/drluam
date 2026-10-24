@@ -80,3 +80,16 @@ def test_plan_route():
 def test_plan_route_rejects_other_confidences(confidence):
     r = client.get("/api/plan", params={"date": "2026-01-15", "confidence": confidence})
     assert r.status_code == 422
+
+
+def test_plan_route_reports_every_levels_target_and_hit_rates():
+    cal = client.get("/api/plan", params={"date": "2026-01-15"}).json()["calibration"]
+    assert [r["confidence"] for r in cal] == list(PLAN_CONFIDENCES)
+    jan = {r["confidence"]: r["januaryHitRate"] for r in cal}
+    for c in PLAN_CONFIDENCES:
+        alone = client.get("/api/plan", params={"date": "2026-01-15", "confidence": c}).json()
+        assert jan[c] == alone["backtest"]["hitRate"]
+    # Pooled Nov 2025 - Sep 2026 from docs/plan-backtest.md, valid at 09:00/09:20 only.
+    assert {r["confidence"]: r["developmentHitRate"] for r in cal}[90] == 0.8397
+    other = client.get("/api/plan", params={"date": "2026-01-15", "cutoff": "06:00"}).json()["calibration"]
+    assert all(r["developmentHitRate"] is None for r in other)

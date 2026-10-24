@@ -83,6 +83,23 @@ export interface AccuracyResponse {
   histogram: { from: number; to: number; mid: number; count: number }[];
 }
 
+export interface PlanLevel {
+  confidence: number;
+  target: number;
+  januaryHitRate: number | null;       // share of January hours with actual >= plan, at this cutoff
+  developmentHitRate: number | null;   // pooled Nov 2025 – Sep 2026; null at cutoffs it wasn't measured for
+}
+
+export interface PlanResponse {
+  date: string;
+  cutoff: string;
+  confidence: number;
+  hours: { time: string; forecastMW: number; adjustedMW: number | null; planMW: number | null }[];
+  day: { planMWh: number | null; rawForecastMWh: number; adjustedMWh: number | null; extraToProcureMWh: number | null };
+  backtest: { period: { firstDelivery: string; lastDelivery: string }; n: number; hitRate?: number; target?: number };
+  calibration: PlanLevel[];
+}
+
 async function get<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const qs = new URLSearchParams(params).toString();
   const res = await fetch(`/api${path}${qs ? `?${qs}` : ""}`);
@@ -94,4 +111,6 @@ export const api = {
   meta: () => get<Meta>("/meta"),
   day: (date: string, cutoff: string) => get<DayResponse>("/day", { date, cutoff }),
   accuracy: (cutoff: string) => get<AccuracyResponse>("/accuracy", { cutoff }),
+  plan: (date: string, cutoff: string, confidence: number) =>
+    get<PlanResponse>("/plan", { date, cutoff, confidence: String(confidence) }),
 };

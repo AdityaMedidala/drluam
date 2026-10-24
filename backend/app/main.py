@@ -23,6 +23,12 @@ from .data import FIRST_DELIVERY, LAST_DELIVERY, load_actuals, load_forecasts
 
 DEFAULT_CUTOFF = "09:20"  # EPEX day-ahead gate closure
 CUTOFF_OPTIONS = ["06:00", "08:00", "09:00", "09:20", "09:30", "09:50", "10:00", "11:00"]
+# Plan hit rates pooled over Nov 2025 - Sep 2026 decisions (7,775 hours), from
+# analysis/plan_backtest.py and docs/plan-backtest.md. Those months aren't in the
+# app's snapshot, so they are constants, valid only where the run selection is
+# the same as at 09:20 (no WINDFOR run is published between 09:00 and 09:20 UK).
+DEV_PLAN_HIT_RATES = {50: 0.495, 70: 0.6691, 80: 0.7561, 90: 0.8397, 95: 0.8938}
+DEV_PLAN_CUTOFFS = {"09:00", "09:20"}
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -182,6 +188,13 @@ def plan(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF, c
         # Backtest over every in-scope delivery day at this cutoff.
         "backtest": {"period": {"firstDelivery": FIRST_DELIVERY, "lastDelivery": LAST_DELIVERY},
                      **an.plan_hit_rate(scoped_frame(cutoff), confidence)},
+        # Every level's target next to what it actually achieved, for the selector and the calibration chart.
+        "calibration": [
+            {"confidence": c, "target": c / 100,
+             "januaryHitRate": an.plan_hit_rate(scoped_frame(cutoff), c).get("hitRate"),
+             "developmentHitRate": DEV_PLAN_HIT_RATES[c] if cutoff in DEV_PLAN_CUTOFFS else None}
+            for c in an.PLAN_CONFIDENCES
+        ],
     })
 
 

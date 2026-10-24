@@ -165,6 +165,7 @@ Outside the app; each analysis runs the app's own logic unchanged on other month
 
 - Add more months to test whether the bias pattern persists.
 - Add other renewables and demand forecasts, so the app shows the actual residual volume to buy.
+- Recalibrate the "plan on" levels so a P90 plan holds about 90% of hours (today about 84%, `docs/plan-backtest.md`). This is a method change: it must be pre-registered and confirmed on Nov 2026+ data, because every earlier month has been used, so the app shows the measured hit rates instead.
 - A better-calibrated band. Three reshaped bands failed (docs/uncertainty.md); the most promising lead, a 14-day residual window, must be pre-registered and confirmed on Nov 2026+ data.
 - Inputs that explain whole-day level errors (curtailment, demand, day type). A simple level-banded ratio failed its test (docs/correction.md).
 - Schedule automatic data refreshes.

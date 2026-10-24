@@ -2,18 +2,36 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { api, type DayResponse, type Meta } from "../api";
+import { api, type DayResponse, type Meta, type PlanResponse } from "../api";
 import { fmtAxisGW, fmtDate, fmtDateTime, fmtGWh, fmtMW, fmtPct, fmtTime, shiftDate } from "../format";
 import { useChartColors } from "../theme";
+import { readParam, writeParam } from "../url";
+import PlanPanel, { CONFIDENCES } from "./PlanPanel";
 import { ChartCard, ErrorState, LegendItem, Loading, StatTile } from "./ui";
+
+function initialDate(meta: Meta) {
+  const d = readParam("date");
+  return d && d >= meta.firstDelivery && d <= meta.lastDelivery ? d : meta.lastDelivery;
+}
+
+function initialConfidence() {
+  const c = Number(readParam("confidence"));
+  return CONFIDENCES.includes(c) ? c : 80;
+}
 
 /** "What did the desk know when it had to buy, and how did it turn out?" for one delivery day. */
 export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: string }) {
   const c = useChartColors();
-  const [date, setDate] = useState(meta.lastDelivery);
+  const [date, setDate] = useState(() => initialDate(meta));
+  const [confidence, setConfidence] = useState(initialConfidence);
   const [showActual, setShowActual] = useState(true);
   const [data, setData] = useState<DayResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [plan, setPlan] = useState<PlanResponse | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
+
+  useEffect(() => { writeParam("date", date); }, [date]);
+  useEffect(() => { writeParam("confidence", String(confidence)); }, [confidence]);
 
   useEffect(() => {
     let live = true;
@@ -23,12 +41,16 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
     return () => { live = false; };
   }, [date, cutoff]);
 
+  useEffect(() => {
+    let live = true;
+    setPlan(null);
+    setPlanError(null);
+    api.plan(date, cutoff, confidence).then((p) => live && setPlan(p)).catch((e) => live && setPlanError(String(e)));
+    return () => { live = false; };
+  }, [date, cutoff, confidence]);
+
   const chartData = useMemo(
     () => data?.series.map((p) => ({ ...p, band: p.low != null && p.high != null ? [p.low, p.high] : null })) ?? [],
-    [data],
-  );
-  const lowEnergy = useMemo(
-    () => (data ? data.series.reduce((s, p) => s + (p.low ?? 0), 0) : null),
     [data],
   );
   const hasCorrection = data?.correctionRatio != null;
@@ -52,6 +74,8 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
           Show what actually happened
         </label>
       </div>
+
+      <PlanPanel plan={plan} error={planError} confidence={confidence} onConfidence={setConfidence} />
 
       {error && <ErrorState error={error} />}
       {!data && !error && <Loading />}
@@ -79,9 +103,6 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
                 ? <>Raw forecast says {fmtGWh(data.summary.forecastEnergyMWh)} — scaled by {data.correctionRatio!.toFixed(2)} because over the last 7 days actual wind came in {fmtPct(Math.abs(1 - data.correctionRatio!))} {data.correctionRatio! < 1 ? "below" : "above"} forecast</>
                 : "Not enough history yet to adjust"}
               note={partialHistory ? `Partial history (${data.historyPoints} of ${data.historyPointsFull} hours): adjustment and band rest on less than a full week` : undefined} />
-            <StatTile label="Low case (P10)"
-              value={hasCorrection ? fmtGWh(lowEnergy) : "–"}
-              sub="Cautious floor: every hour at the bottom of its band (the band's P10 of last week's adjusted-forecast errors)" />
             <StatTile label="Peak hour (raw forecast)" value={fmtMW(data.summary.peakForecastMW)} />
             {showActual && (
               <StatTile label="What actually happened"
