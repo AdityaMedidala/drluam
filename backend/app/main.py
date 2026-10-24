@@ -7,6 +7,7 @@ GET /api/accuracy?cutoff=             accuracy of decision forecasts across Janu
 from __future__ import annotations
 
 import math
+from contextlib import asynccontextmanager
 from datetime import date, time
 from functools import lru_cache
 
@@ -14,6 +15,7 @@ import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from . import analysis as an
 from .data import FIRST_DELIVERY, LAST_DELIVERY, load_actuals, load_forecasts
@@ -21,7 +23,15 @@ from .data import FIRST_DELIVERY, LAST_DELIVERY, load_actuals, load_forecasts
 DEFAULT_CUTOFF = "09:00"
 CUTOFF_OPTIONS = ["06:00", "08:00", "09:00", "09:30", "10:00", "11:00"]
 
-app = FastAPI(title="Wind Forecast Portal API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Read the snapshot once at startup: a missing or broken CSV fails the deploy, not the first request.
+    load_actuals()
+    load_forecasts()
+    yield
+
+
+app = FastAPI(title="Wind Forecast Portal API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
 
 
@@ -62,7 +72,13 @@ def scoped_frame(cutoff_str: str) -> pd.DataFrame:
 # --------------------------------------------------------------------------- routes
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    try:
+        actual_rows, forecast_rows = len(load_actuals()), len(load_forecasts())
+    except Exception as exc:  # noqa: BLE001 -- any load failure means the API can't serve data
+        return JSONResponse({"status": "error", "detail": f"{type(exc).__name__}: {exc}"}, status_code=503)
+    if not actual_rows or not forecast_rows:
+        return JSONResponse({"status": "error", "detail": "data snapshot is empty"}, status_code=503)
+    return {"status": "ok", "actualRows": actual_rows, "forecastRows": forecast_rows}
 
 
 @app.get("/api/meta")

@@ -44,3 +44,28 @@ def test_accuracy_reports_band_coverage():
     assert abs(band["coverage"] + band["below"] + band["above"] - 1) < 1e-3
     day = client.get("/api/day", params={"date": "2026-01-15"}).json()
     assert day["bandCoverage"] == band["coverage"]
+
+
+def test_health_reports_loaded_data():
+    body = client.get("/api/health").json()
+    assert body["status"] == "ok"
+    assert body["actualRows"] > 0 and body["forecastRows"] > 0
+
+
+def test_health_is_503_when_data_cannot_load(monkeypatch):
+    import app.main as main
+
+    def broken():
+        raise FileNotFoundError("actuals_wind.csv")
+
+    monkeypatch.setattr(main, "load_actuals", broken)
+    r = client.get("/api/health")
+    assert r.status_code == 503
+    assert r.json()["status"] == "error"
+
+
+def test_startup_loads_data():
+    from app.data import load_actuals, load_forecasts
+    load_actuals.cache_clear(); load_forecasts.cache_clear()
+    with TestClient(app):  # runs the lifespan startup
+        assert load_actuals.cache_info().currsize == 1 and load_forecasts.cache_info().currsize == 1
