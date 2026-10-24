@@ -26,6 +26,7 @@
 @use '@carbon/styles/scss/components/popover';
 @use '@carbon/styles/scss/components/overflow-menu';
 @use '@carbon/styles/scss/components/number-input';
+@use '@carbon/styles/scss/components/tag';
 @use '@carbon/styles/scss/components/tooltip';
 @use '@carbon/styles/scss/components/notification';
 @use '@carbon/styles/scss/components/skeleton-styles';
@@ -70,7 +71,7 @@ $chrome: 48px + $bar;
 .decision-list { margin-bottom: 0; }
 .decision-list .cds--structured-list-td:last-child { text-align: right; white-space: nowrap; }
 .drift { display: flex; flex-direction: column; flex: 1; min-height: 0; margin-top: $spacing-05; padding-top: $spacing-05; border-top: 1px solid var(--cds-border-subtle-01); }
-.drift .drift-plot { flex: 1; min-height: 150px; }
+.drift .drift-plot { flex: 1; min-height: 100px; }
 .figures { display: flex; flex-wrap: wrap; gap: $spacing-05 $spacing-09; margin: $spacing-06 0; }
 .figures div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 $spacing-03; }
 .figures div > span:first-child { white-space: nowrap; }
@@ -175,11 +176,13 @@ $chrome: 48px + $bar;
 .chart-frame:fullscreen > [class*="plot"] { flex: 1; height: auto; }
 
 // cost-aware exceedance level, a compact block in the decision panel
-.cost { margin-top: $spacing-05; padding-top: $spacing-05; border-top: 1px solid var(--cds-border-subtle-01); }
-.cost-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: $spacing-03; margin: $spacing-03 0 $spacing-04; }
+.cost { margin-top: $spacing-03; padding-top: $spacing-04; border-top: 1px solid var(--cds-border-subtle-01); }
+.cost-list .cost-tag { margin: 0 0 0 $spacing-02; vertical-align: baseline; }
+.cost-list .cost-use { margin-left: $spacing-02; font-size: 0.75rem; }
+.cost-inputs { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: $spacing-04; margin: 0 0 $spacing-04; padding: 0; border: 0; }
 .cost-inputs legend { grid-column: 1 / -1; margin-bottom: $spacing-03; }
-.cost-inputs { border: 0; padding: 0; }
-.cost-rec { font-size: 0.875rem; }
+.cost-inputs .cds--number, .cost-inputs .cds--number input { width: 100%; min-width: 0; }
+.cost-inputs .cds--label { white-space: nowrap; }
 .cost-note { margin-top: $spacing-02; font-size: 0.75rem; color: var(--cds-text-secondary); }
-.cost-backtest { margin-top: $spacing-03; }
+.cost-backtest { margin-top: 0; }
 .cost-table tr.lowest td { font-weight: 600; background: var(--cds-layer-selected-01); }

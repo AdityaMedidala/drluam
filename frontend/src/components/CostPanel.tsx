@@ -1,4 +1,7 @@
-import { Accordion, AccordionItem, Link, NumberInput, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@carbon/react";
+import {
+  Accordion, AccordionItem, Link, NumberInput, StructuredListBody, StructuredListCell, StructuredListRow, StructuredListWrapper,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tag,
+} from "@carbon/react";
 import { useEffect, useState } from "react";
 import { api, type CostResponse, type CostRow } from "../api";
 import { ErrorState, Loading } from "./ui";
@@ -43,35 +46,63 @@ export default function CostPanel({ cutoff, short, long, confidence, onCosts, on
 
   const rec = data?.recommended;
   const bt = data?.backtest;
-  const exact = rec ? Math.round(rec.exact) : null;
+  const dev = data?.development ?? null;
+  // Displayed theory level: never "P50" for a ratio that snapped, never "P100".
+  const theory = rec ? Math.min(Math.round(rec.exact), rec.snapped ? 49 : 99) : null;
+  // Theory and the 11-month backtest: one level when they agree, both (unranked) when they don't.
+  const candidates = rec ? [...new Set([rec.level, ...(dev ? [dev.bestLevel] : [])])].sort((a, b) => a - b) : [];
+  const cost = (level: number) => bt?.rows.find((r) => r.confidence === level)?.costGBP ?? 0;
   const recRow = bt?.rows.find((r) => r.confidence === rec?.level);
-  const money = (n: number) => `£${n.toLocaleString("en-GB")}`;
+  const use = (level: number) => (
+    <Link href="#" className="cost-use" onClick={(e: React.MouseEvent) => { e.preventDefault(); onUseLevel(level); }}>Use P{level}</Link>
+  );
+  const match = <><span aria-hidden="true"> ✓</span><span className="cds--visually-hidden"> (matches the theory)</span></>;
   return (
     <section aria-label="Cost-aware exceedance level" className="cost">
-      <div className="label">Cost-aware exceedance level</div>
+      <div className="label">Cost-aware level</div>
       {error && <ErrorState error={error} />}
       {!data && !error && <Loading height={48} />}
       {rec && bt && (
-        <p className="cost-rec">
-          At {money(short)} short and {money(long)} long per MWh (desk assumptions, illustrative){" "}
-          {rec.snapped
-            ? <>the cost ratio gives P{exact}. That is below P50, so P50 is recommended.</>
-            : exact === rec.level
-              ? <>the recommended level is P{rec.level}.</>
-              : <>the recommended level is P{exact}, nearest offered P{rec.level}.</>}
-          {bt.bestLevel !== rec.level && <> Lowest backtest cost at P{bt.bestLevel}.</>}
-          {" "}
-          {confidence === rec.level
-            ? <span className="target">In use.</span>
-            : <Link href="#" onClick={(e: React.MouseEvent) => { e.preventDefault(); onUseLevel(rec.level); }}>Use P{rec.level}</Link>}
-        </p>
+        <StructuredListWrapper isCondensed aria-label="Cost-aware level" className="decision-list cost-list">
+          <StructuredListBody>
+            <StructuredListRow>
+              <StructuredListCell>Short · Long</StructuredListCell>
+              <StructuredListCell>£{short.toLocaleString("en-GB")} · £{long.toLocaleString("en-GB")} per MWh</StructuredListCell>
+            </StructuredListRow>
+            <StructuredListRow>
+              <StructuredListCell>Recommended</StructuredListCell>
+              <StructuredListCell>
+                {candidates.map((c) => `P${c}`).join(" or ")}{" "}
+                <span className="target">(theory P{theory}{rec.snapped ? ", snapped" : ""})</span>
+                {candidates.map((c) => c === confidence
+                  ? <Tag key={c} size="sm" type="gray" className="cost-tag">{candidates.length > 1 ? `P${c} selected` : "Selected"}</Tag>
+                  : <span key={c}> {use(c)}</span>)}
+              </StructuredListCell>
+            </StructuredListRow>
+            <StructuredListRow>
+              <StructuredListCell>11-month backtest</StructuredListCell>
+              <StructuredListCell>
+                {dev ? <>P{dev.bestLevel}{dev.bestLevel === rec.level && match}</> : <span className="target">Not measured at {cutoff}</span>}
+              </StructuredListCell>
+            </StructuredListRow>
+            <StructuredListRow>
+              <StructuredListCell>January only</StructuredListCell>
+              <StructuredListCell>
+                P{bt.bestLevel}
+                {bt.bestLevel === rec.level
+                  ? match
+                  : <>, £{gbpM(cost(rec.level) - cost(bt.bestLevel))}m less than P{rec.level}</>}
+              </StructuredListCell>
+            </StructuredListRow>
+          </StructuredListBody>
+        </StructuredListWrapper>
       )}
       <Accordion size="sm" className="cost-backtest">
         <AccordionItem title="Costs and backtest">
           <fieldset className="cost-inputs">
             <legend className="cds--label">Desk assumptions, illustrative</legend>
-            <CostInput id="cost-short" label="Cost of being short (£/MWh)" value={short} onValue={(n) => onCosts(n, long)} />
-            <CostInput id="cost-long" label="Cost of being long (£/MWh)" value={long} onValue={(n) => onCosts(short, n)} />
+            <CostInput id="cost-short" label="Short · £/MWh" value={short} onValue={(n) => onCosts(n, long)} />
+            <CostInput id="cost-long" label="Long · £/MWh" value={long} onValue={(n) => onCosts(short, n)} />
           </fieldset>
           {rec && bt && (
             <>

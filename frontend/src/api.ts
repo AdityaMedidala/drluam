@@ -114,6 +114,8 @@ export interface CostResponse {
   short: number;               // GBP/MWh, desk assumption
   long: number;
   recommended: { exact: number; level: number; snapped: boolean };   // newsvendor: 100 x short / (short + long)
+  // Nov 2025 – Sep 2026 lowest-cost level for these costs; null at decision times it wasn't measured for
+  development: { bestLevel: number; hours: number; period: { firstDecision: string; lastDecision: string } } | null;
   backtest: { period: { firstDelivery: string; lastDelivery: string }; hours: number; rows: CostRow[]; lowest: string; bestLevel: number };
 }
 

@@ -23,10 +23,11 @@ test("decision view shows the plan, both charts and no errors", async ({ page })
   await expect(page.locator(".recharts-surface")).toHaveCount(2);
   // The menu button exists only below Carbon's large breakpoint.
   await expect(page.getByRole("button", { name: "Open menu" })).toBeHidden();
-  // Both x-axes sit above the fold at 1440x900.
+  // Both x-axes sit above the fold at 1440x900, inside their tile (not clipped by it).
   for (const axis of await page.locator(".recharts-xAxis").all()) {
     const box = await axis.boundingBox();
-    expect(box!.y + box!.height).toBeLessThanOrEqual(900);
+    const tile = await axis.evaluate((e) => e.closest(".tile")!.getBoundingClientRect().bottom);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(Math.min(900, tile));
   }
   expect(await seriousViolations(page)).toEqual([]);
   expect(errors).toEqual([]);
@@ -106,19 +107,29 @@ test("a mouse click on a header tab leaves no focus ring", async ({ page }) => {
 test("the cost block recommends a level, applies it, and keeps the costs in the URL", async ({ page }) => {
   await page.goto("/?date=2026-01-17&cutoff=09:20&confidence=50");
   const block = page.getByRole("region", { name: "Cost-aware exceedance level" });
-  await expect(block).toContainText("At £100 short and £30 long per MWh (desk assumptions, illustrative) the recommended level is P77, nearest offered P80.");
+  const row = (label: string) => block.locator(".cds--structured-list-row", { hasText: label });
+  await expect(row("Short · Long")).toContainText("£100 · £30 per MWh");
+  await expect(row("Recommended")).toContainText("P80 (theory P77)");
+  await expect(row("11-month backtest")).toContainText("P80 ✓");
+  await expect(row("January only")).toContainText("P70, £4.6m less than P80");
   await block.getByRole("link", { name: "Use P80" }).click();
   await expect(page.getByRole("tab", { name: "P80" })).toHaveAttribute("aria-selected", "true");
   await expect(page).toHaveURL(/confidence=80/);
-  await expect(block).toContainText("In use.");
+  await expect(row("Recommended")).toContainText("Selected");
+  await expect(block.getByRole("link", { name: "Use P80" })).toHaveCount(0);
 
   await block.getByRole("button", { name: "Costs and backtest" }).click();
   await expect(block.locator(".cost-table tbody tr")).toHaveCount(7);
   await expect(block.locator(".cost-table tr.lowest")).toHaveCount(1);
-  await block.getByLabel("Cost of being short (£/MWh)").fill("20");
-  await block.getByLabel("Cost of being long (£/MWh)").fill("80");
-  await expect(block).toContainText("the cost ratio gives P20. That is below P50, so P50 is recommended.");
-  await expect(page).toHaveURL(/short=20/);
-  await expect(page).toHaveURL(/long=80/);
+  await block.getByLabel("Short · £/MWh").fill("200");
+  await block.getByLabel("Long · £/MWh").fill("20");
+  // theory P91 -> P90, the 11-month backtest says P95: both shown, neither picked
+  await expect(row("Recommended")).toContainText("P90 or P95 (theory P91)");
+  await expect(row("11-month backtest")).toHaveText(/P95$/);
+  await expect(page).toHaveURL(/short=200/);
+  await expect(page).toHaveURL(/long=20/);
+  await block.getByLabel("Short · £/MWh").fill("20");
+  await block.getByLabel("Long · £/MWh").fill("80");
+  await expect(row("Recommended")).toContainText("P50 (theory P20, snapped)");
   expect(await seriousViolations(page)).toEqual([]);
 });
