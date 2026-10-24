@@ -83,6 +83,17 @@ def scoped_frame(cutoff_str: str) -> pd.DataFrame:
     return an.in_scope(decision_frame(cutoff_str), FIRST_DELIVERY, LAST_DELIVERY)
 
 
+def plan_calibration(cutoff_str: str) -> list[dict]:
+    """Every plan level's target next to the hit rate it actually achieved (January, and pooled dev months)."""
+    jan = scoped_frame(cutoff_str)
+    return [
+        {"confidence": c, "target": c / 100,
+         "januaryHitRate": an.plan_hit_rate(jan, c).get("hitRate"),
+         "developmentHitRate": DEV_PLAN_HIT_RATES[c] if cutoff_str in DEV_PLAN_CUTOFFS else None}
+        for c in an.PLAN_CONFIDENCES
+    ]
+
+
 # --------------------------------------------------------------------------- routes
 @app.get("/api/health")
 def health():
@@ -188,13 +199,7 @@ def plan(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF, c
         # Backtest over every in-scope delivery day at this cutoff.
         "backtest": {"period": {"firstDelivery": FIRST_DELIVERY, "lastDelivery": LAST_DELIVERY},
                      **an.plan_hit_rate(scoped_frame(cutoff), confidence)},
-        # Every level's target next to what it actually achieved, for the selector and the calibration chart.
-        "calibration": [
-            {"confidence": c, "target": c / 100,
-             "januaryHitRate": an.plan_hit_rate(scoped_frame(cutoff), c).get("hitRate"),
-             "developmentHitRate": DEV_PLAN_HIT_RATES[c] if cutoff in DEV_PLAN_CUTOFFS else None}
-            for c in an.PLAN_CONFIDENCES
-        ],
+        "calibration": plan_calibration(cutoff),
     })
 
 
@@ -225,6 +230,7 @@ def accuracy(cutoff: str = DEFAULT_CUTOFF):
             "adjusted": an.error_metrics(both["adjError"], both["actual"]),
         },
         "band": an.band_coverage(f),
+        "planCalibration": plan_calibration(cutoff),
         "byHour": an.grouped_metrics(f, uk_hour),
         "byLevel": an.grouped_metrics(f, level),
         "byHorizon": an.horizon_metrics(load_forecasts(), load_actuals(), FIRST_DELIVERY, LAST_DELIVERY),

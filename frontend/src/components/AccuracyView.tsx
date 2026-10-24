@@ -35,6 +35,8 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
   const windiest = data.byLevel[data.byLevel.length - 1];
   const hist = data.histogram.map((b) => ({ ...b, mid: (b.from + b.to) / 2 }));
   const daily = data.daily.map((d) => ({ ...d, label: fmtDate(d.deliveryDate) }));
+  const calibration = data.planCalibration;
+  const hasDev = calibration.some((r) => r.developmentHitRate != null);
 
   return (
     <div className="view">
@@ -69,6 +71,55 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
       </p>
 
       <div className="grid">
+        <ChartCard title="Does the plan hold as often as it promises?"
+          subtitle={<>Each &quot;plan on&quot; level from the Decision view: the share of hours the actual came in at or above it, against its target · on the dashed line = honest; below it = the plan promises more than it delivers</>}
+          legend={<>
+            <LegendItem color={c.adjusted} label="January 2026 (circles)" />
+            {hasDev && <LegendItem color={c.actual} label="Nov 2025 – Sep 2026 (squares)" />}
+            <LegendItem color={c.axis} label="Target (45°)" dashed />
+          </>}
+        >
+          <div className="chart-md">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={calibration} margin={{ top: 8, right: 16, bottom: 12, left: 0 }}>
+                <CartesianGrid stroke={c.grid} />
+                <XAxis type="number" dataKey="target" domain={[0.4, 1]} ticks={[0.5, 0.6, 0.7, 0.8, 0.9, 1]} tickFormatter={(v) => fmtPct(v)}
+                  stroke={c.axis} tickLine={false} fontSize={12}
+                  label={{ value: "Target (plan level)", position: "insideBottom", offset: -2, fill: c.axis, fontSize: 11 }} height={36} />
+                <YAxis type="number" domain={[0.4, 1]} ticks={[0.5, 0.6, 0.7, 0.8, 0.9, 1]} tickFormatter={(v) => fmtPct(v)}
+                  stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={44} />
+                <ReferenceLine segment={[{ x: 0.4, y: 0.4 }, { x: 1, y: 1 }]} stroke={c.axis} strokeDasharray="4 4" ifOverflow="hidden" />
+                <Tooltip content={({ active, payload }) =>
+                  active && payload?.length ? (
+                    <div className="tooltip">
+                      <div className="tooltip-title">P{payload[0].payload.confidence} plan · target {fmtPct(payload[0].payload.target)}</div>
+                      <div className="tooltip-row"><span>Held in January</span><strong>{fmtPct(payload[0].payload.januaryHitRate)}</strong></div>
+                      {payload[0].payload.developmentHitRate != null && (
+                        <div className="tooltip-row"><span>Held Nov 2025 – Sep 2026</span><strong>{fmtPct(payload[0].payload.developmentHitRate)}</strong></div>
+                      )}
+                    </div>
+                  ) : null} />
+                <Line dataKey="januaryHitRate" stroke={c.adjusted} strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
+                {hasDev && <Line dataKey="developmentHitRate" stroke={c.actual} strokeWidth={2}
+                  dot={squareDot(c.actual)} isAnimationActive={false} />}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <details className="table-toggle">
+            <summary>View as table</summary>
+            <table>
+              <thead><tr><th>Plan level</th><th>Target</th><th>Held, January</th><th>Held, Nov 2025 – Sep 2026</th></tr></thead>
+              <tbody>
+                {calibration.map((r) => (
+                  <tr key={r.confidence}>
+                    <td>P{r.confidence}</td><td>{fmtPct(r.target)}</td><td>{fmtPct(r.januaryHitRate)}</td><td>{fmtPct(r.developmentHitRate)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        </ChartCard>
+
         <ChartCard title="How far off was each hour?"
           subtitle="Raw forecast minus actual, all hours · right of zero = forecast too high"
         >
@@ -216,3 +267,8 @@ function GroupTooltip({ active, payload, metric, rawOnly, hour }: any & { c: Cha
     </div>
   );
 }
+
+// Square markers keep the second calibration series distinct without relying on colour.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const squareDot = (fill: string) => ({ cx, cy, index }: any) =>
+  cx == null || cy == null ? <g key={index} /> : <rect key={index} x={cx - 4} y={cy - 4} width={8} height={8} fill={fill} />;

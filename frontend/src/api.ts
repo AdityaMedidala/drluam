@@ -76,6 +76,7 @@ export interface AccuracyResponse {
   raw: Metrics;
   comparison: { days: number; daysAdjustedBetter: number; raw: Metrics; adjusted: Metrics };
   band: BandCoverage;
+  planCalibration: PlanLevel[];
   byHour: GroupRow[];
   byLevel: GroupRow[];
   byHorizon: GroupRow[];

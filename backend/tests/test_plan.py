@@ -93,3 +93,9 @@ def test_plan_route_reports_every_levels_target_and_hit_rates():
     assert {r["confidence"]: r["developmentHitRate"] for r in cal}[90] == 0.8397
     other = client.get("/api/plan", params={"date": "2026-01-15", "cutoff": "06:00"}).json()["calibration"]
     assert all(r["developmentHitRate"] is None for r in other)
+
+
+def test_accuracy_carries_the_plan_calibration():
+    acc = client.get("/api/accuracy").json()["planCalibration"]
+    plan = client.get("/api/plan", params={"date": "2026-01-15"}).json()["calibration"]
+    assert acc == plan
