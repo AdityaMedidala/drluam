@@ -11,12 +11,13 @@ Usage (from the repo root):
 Writes:
     backend/data/actuals_wind.csv    startTime, settlementDate, settlementPeriod, publishTime, generation
     backend/data/forecasts_wind.csv  publishTime, startTime, generation
-    backend/data/manifest.json       fetch time, requested and actual ranges, row counts
+    backend/data/manifest.json       fetch time, requested and actual ranges, row counts, sha256 of each CSV
 
 Exits non-zero (and writes nothing) if any chunk comes back empty or the
 actuals have missing half-hours, so a partial snapshot can't slip in silently.
 """
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -101,6 +102,10 @@ def fetch_forecasts(start: datetime, end: datetime, chunk_hours: int = 24) -> pd
     return df.drop_duplicates(["publishTime", "startTime"]).sort_values(["publishTime", "startTime"])
 
 
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--first-delivery", default="2026-01-02")
@@ -136,12 +141,16 @@ def main() -> None:
         "source": BASE,
         "actuals": {
             "dataset": "FUELHH (fuelType=WIND)",
+            "file": "actuals_wind.csv",
+            "sha256": sha256(out_dir / "actuals_wind.csv"),
             "requestedSettlementDates": [act_start.isoformat(), act_end.isoformat()],
             "startTimeRange": [str(actuals["startTime"].min()), str(actuals["startTime"].max())],
             "rows": len(actuals),
         },
         "forecasts": {
             "dataset": "WINDFOR",
+            "file": "forecasts_wind.csv",
+            "sha256": sha256(out_dir / "forecasts_wind.csv"),
             "requestedPublishWindow": [pub_start.isoformat(), pub_end.isoformat()],
             "publishTimeRange": [str(forecasts["publishTime"].min()), str(forecasts["publishTime"].max())],
             "startTimeRange": [str(forecasts["startTime"].min()), str(forecasts["startTime"].max())],

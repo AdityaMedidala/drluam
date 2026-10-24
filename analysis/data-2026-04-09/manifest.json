@@ -3,6 +3,8 @@
   "source": "https://data.elexon.co.uk/bmrs/api/v1/datasets",
   "actuals": {
     "dataset": "FUELHH (fuelType=WIND)",
+    "file": "actuals_wind.csv",
+    "sha256": "cfdb5ba88d1a4a2382ba4ec530c48e3e71c24620fa68d02db343b93a49ca7d91",
     "requestedSettlementDates": [
       "2026-03-17",
       "2026-10-02"
@@ -15,6 +17,8 @@
   },
   "forecasts": {
     "dataset": "WINDFOR",
+    "file": "forecasts_wind.csv",
+    "sha256": "40ac528209672a85d5c30c4123f198b873a65d4990b72ae6f210b337ffe241e9",
     "requestedPublishWindow": [
       "2026-03-15T00:00:00+00:00",
       "2026-10-01T00:00:00+00:00"
