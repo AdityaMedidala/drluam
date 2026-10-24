@@ -110,8 +110,10 @@ def main() -> None:
     last = date.fromisoformat(args.last_delivery)
 
     # Extra history before the first delivery day: the bias correction looks back
-    # 7 days from each decision, so early-January decisions need late-December data.
-    history = timedelta(days=9)
+    # 7 days from each decision, and the band uses the out-of-sample errors of each
+    # of those 7 days -- whose own ratios look back another 7 days. So the first
+    # delivery day needs ~2 weeks of history (16 days covers it with margin).
+    history = timedelta(days=16)
     act_start, act_end = first - history, last + timedelta(days=1)
     actuals = fetch_actuals(act_start, act_end)
     gaps = missing_half_hours(actuals)
