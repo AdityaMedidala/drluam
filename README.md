@@ -125,6 +125,15 @@ python backend/scripts/fetch_data.py
 python backend/scripts/explore_data.py   # sanity-check what came back
 ```
 
+The analysis data in `analysis/` (about 20 MB) is not in git. Only each directory's `manifest.json` is committed, with the row counts and a sha256 for each CSV. To rebuild it:
+
+```bash
+python backend/scripts/fetch_data.py --first-delivery 2025-11-02 --last-delivery 2026-04-01 --out-dir analysis/data
+python backend/scripts/fetch_data.py --first-delivery 2026-04-02 --last-delivery 2026-10-01 --out-dir analysis/data-2026-04-09
+python backend/scripts/fetch_data.py --first-delivery 2025-01-02 --last-delivery 2025-11-01 --out-dir analysis/vault-2025
+git diff analysis/*/manifest.json   # only fetchedAt should change; a sha256 change means Elexon revised the data
+```
+
 ## Deployment
 
 Deployed on Vercel as one project using [Vercel Services](https://vercel.com/docs/services). The Vite frontend serves `/`, and the FastAPI backend serves `/api/*` (see `vercel.json`). Import the repo in Vercel, and it builds both.
