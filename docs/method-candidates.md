@@ -6,7 +6,7 @@ This page records the one candidate worth confirming later, with the rule for th
 
 ## Candidate: a band built from 14 days of residuals (promising, unconfirmed)
 
-**What changes.** The band (and the "plan on" levels, which use the same residuals) would use the out-of-sample residuals from the previous **14** days of hours whose actuals are known at the cutoff, instead of 7. Everything else stays as in the app: the 7-day ratio correction, residual = actual − that day's own adjusted forecast, at least 24 residuals, P10/P90 for the band.
+**What changes.** The band (and the planning volumes at each exceedance level, which use the same residuals) would use the out-of-sample residuals from the previous **14** days of hours whose actuals are known at the cutoff, instead of 7. Everything else stays as in the app: the 7-day ratio correction, residual = actual − that day's own adjusted forecast, at least 24 residuals, P10/P90 for the band.
 
 **Evidence so far** (descriptive only, because no rule was set before these months were seen):
 

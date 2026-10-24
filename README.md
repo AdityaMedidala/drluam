@@ -73,7 +73,7 @@ flowchart LR
 ├── frontend/
 │   ├── src/
 │   │   ├── api.ts           # typed API client
-│   │   ├── App.tsx          # layout, tabs, cutoff selector
+│   │   ├── App.tsx          # Carbon UI shell, page header and controls
 │   │   ├── components/      # DecisionView, AccuracyView, shared UI
 │   │   ├── format.ts        # number/time formatting (UK time)
 │   │   └── theme.ts         # chart colours (colour-blind safe, light/dark)
@@ -153,7 +153,7 @@ Outside the app; each analysis runs the app's own logic unchanged on other month
 - **[docs/correction.md](docs/correction.md): the level-aware correction FAILED its pre-registered test** on the untouched Jan–Oct 2025 data: MAE lower in only 3 of 10 months (the rule needed 8) and |bias| worse in 9 of 10, so the app keeps the simple 7-day ratio. That vault is now spent; [docs/data-usage.md](docs/data-usage.md) records which data has been used, and future changes must be confirmed on Nov 2026+ data.
 - [docs/validation.md](docs/validation.md): on Nov 2025 – Mar 2026 the correction removes 82–102% of the bias and cuts MAE by 10–54% in every month. The band under-covers everywhere (64–73% vs 80%). Against naive references (Nov 2025 – Sep 2026, day-block bootstrap): the correction beats the raw forecast by 30% pooled (95% CI +26% to +34%), with an interval above zero in 10 of 11 months (three only just), and both forecasts beat persistence in every month (raw by 42–69%, adjusted by 52–78%).
 - [docs/error-anatomy.md](docs/error-anatomy.md): across Nov 2025 – Sep 2026 the error is mostly whole-day level, not timing (a per-day level fix would remove 55% of MAE, a time shift 17%). The forecast catches only half of >2 GW ramps.
-- [docs/plan-backtest.md](docs/plan-backtest.md): the "plan on C%" number is about right at P50 but over-promises in the tail. Across Nov 2025 – Sep 2026 a 90% plan was met in 84% of hours and a 95% plan in 89% (January: 82% and 89%).
+- [docs/plan-backtest.md](docs/plan-backtest.md): the planning volume at each exceedance level is about right at P50 but under-covers in the tail. Across Nov 2025 – Sep 2026 the P90 planning volume held in 84% of hours and the P95 volume in 89% (January: 82% and 89%).
 - [docs/uncertainty.md](docs/uncertainty.md): three alternative bands were tested against a rule fixed in advance. None beat the current band on pinball loss, so it is kept.
 - [docs/method-candidates.md](docs/method-candidates.md): the one change worth confirming later, a band built from 14 days of residuals, is **promising, unconfirmed**: it raised coverage in 10 of 11 months. Its adoption rule is written down for Nov 2026+ data; nothing new is adopted before submission.
 
@@ -167,7 +167,7 @@ Outside the app; each analysis runs the app's own logic unchanged on other month
 
 - Add more months to test whether the bias pattern persists.
 - Add other renewables and demand forecasts, so the app shows the actual residual volume to buy.
-- Recalibrate the "plan on" levels so a P90 plan holds about 90% of hours (today about 84%, `docs/plan-backtest.md`). This is a method change: it must be pre-registered and confirmed on Nov 2026+ data, because every earlier month has been used, so the app shows the measured hit rates instead.
+- Recalibrate the exceedance levels so the P90 planning volume holds in about 90% of hours (today about 84%, `docs/plan-backtest.md`). This is a method change: it must be pre-registered and confirmed on Nov 2026+ data, because every earlier month has been used, so the app shows the measured hit rates instead.
 - A better-calibrated band. Three reshaped bands failed (docs/uncertainty.md); the most promising lead, a 14-day residual window, is pre-registered for confirmation on Nov 2026+ data (docs/method-candidates.md).
 - Forecast curtailment directly. Accepted wind bids account for about 87% of January's average gap (docs/curtailment-check.md), so a constraint or curtailment forecast is the most promising input for whole-day level errors. A simple level-banded ratio failed its test (docs/correction.md).
 - Schedule automatic data refreshes.

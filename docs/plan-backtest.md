@@ -1,6 +1,6 @@
-# "Plan on" backtest: how often wind came in at or above the plan
+# Planning-volume backtest: how often outturn came in at or above the planning volume
 
-The app's Decision view gives a planning number per hour: the wind the desk can count on with C% confidence. It is the adjusted forecast plus the (1 − C) quantile of the trailing week's out-of-sample residuals, floored at 0 MW (`backend/app/analysis.py`). The 90% plan equals the band's P10 edge.
+The app's Decision view gives a planning volume per hour at a chosen exceedance level C (P50–P95): the wind volume expected to be met or exceeded in C% of hours. It is the adjusted forecast plus the (1 − C) quantile of the trailing week's out-of-sample residuals, floored at 0 MW (`backend/app/analysis.py`). The 90% plan equals the band's P10 edge.
 
 A plan is honest if the actual comes in at or above it C% of the time. This page measures that. It is a description of the existing method, not a method change, so there is no decision rule to pre-register.
 
@@ -37,4 +37,4 @@ November 2025 has 480 hours because the backtest ignores everything before 1 Nov
 
 ## How the app uses this
 
-The Decision view shows each level with its measured hit rate: the pooled Nov 2025 – Sep 2026 rate on the confidence cards ("held"), and both the pooled and the January rate in the sentence under the plan. At cutoffs other than 09:00/09:20 the pooled rate was not measured, so the cards show January and say so. The desk sees the measured figure, not the nominal one.
+The Decision view shows the measured hit rate next to the planning volume, as "P90 hit rate (backtest)", with its period in a tooltip: the pooled Nov 2025 – Sep 2026 rate at the 09:00/09:20 decision times, and the January 2026 rate otherwise (stated in the tooltip). The Accuracy view plots every level against its target. The desk sees the measured figure, not the nominal one.
