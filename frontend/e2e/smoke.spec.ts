@@ -102,3 +102,23 @@ test("a mouse click on a header tab leaves no focus ring", async ({ page }) => {
   await expect(tab).toBeFocused();
   expect(await tab.evaluate((e) => getComputedStyle(e).borderColor)).toBe("rgba(0, 0, 0, 0)");
 });
+
+test("the cost block recommends a level, applies it, and keeps the costs in the URL", async ({ page }) => {
+  await page.goto("/?date=2026-01-17&cutoff=09:20&confidence=50");
+  const block = page.getByRole("region", { name: "Cost-aware exceedance level" });
+  await expect(block).toContainText("At £100 short and £30 long per MWh (desk assumptions, illustrative) the recommended level is P77, nearest offered P80.");
+  await block.getByRole("link", { name: "Use P80" }).click();
+  await expect(page.getByRole("tab", { name: "P80" })).toHaveAttribute("aria-selected", "true");
+  await expect(page).toHaveURL(/confidence=80/);
+  await expect(block).toContainText("In use.");
+
+  await block.getByRole("button", { name: "Costs and backtest" }).click();
+  await expect(block.locator(".cost-table tbody tr")).toHaveCount(7);
+  await expect(block.locator(".cost-table tr.lowest")).toHaveCount(1);
+  await block.getByLabel("Cost of being short (£/MWh)").fill("20");
+  await block.getByLabel("Cost of being long (£/MWh)").fill("80");
+  await expect(block).toContainText("the cost ratio gives P20. That is below P50, so P50 is recommended.");
+  await expect(page).toHaveURL(/short=20/);
+  await expect(page).toHaveURL(/long=80/);
+  expect(await seriousViolations(page)).toEqual([]);
+});

@@ -102,6 +102,21 @@ export interface PlanResponse {
   calibration: PlanLevel[];
 }
 
+export interface CostRow {
+  key: string;                 // "P50" … "P95", "forecast" (NESO) or "adjusted" (bias-corrected)
+  confidence: number | null;   // the exceedance level, null for the two forecasts
+  costGBP: number;
+  vsNesoGBP: number;           // cost minus the NESO forecast's cost
+}
+
+export interface CostResponse {
+  cutoff: string;
+  short: number;               // GBP/MWh, desk assumption
+  long: number;
+  recommended: { exact: number; level: number; snapped: boolean };   // newsvendor: 100 x short / (short + long)
+  backtest: { period: { firstDelivery: string; lastDelivery: string }; hours: number; rows: CostRow[]; lowest: string; bestLevel: number };
+}
+
 export interface DriftRun {
   publishedUtc: string;
   isDecisionRun: boolean;
@@ -133,6 +148,8 @@ export const api = {
   day: (date: string, cutoff: string) => get<DayResponse>("/day", { date, cutoff }),
   accuracy: (cutoff: string) => get<AccuracyResponse>("/accuracy", { cutoff }),
   drift: (date: string, cutoff: string) => get<DriftResponse>("/drift", { date, cutoff }),
+  cost: (cutoff: string, short: number, long: number) =>
+    get<CostResponse>("/cost", { cutoff, short: String(short), long: String(long) }),
   plan: (date: string, cutoff: string, confidence: number) =>
     get<PlanResponse>("/plan", { date, cutoff, confidence: String(confidence) }),
 };

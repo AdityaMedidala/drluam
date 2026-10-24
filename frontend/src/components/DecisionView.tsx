@@ -4,13 +4,15 @@ import { Area, CartesianGrid, ComposedChart, Customized, Line, ResponsiveContain
 import { api, type DayResponse, type DriftResponse, type Meta, type PlanResponse } from "../api";
 import { fmtMW, fmtTime, gwAxis } from "../format";
 import { useChartColors } from "../theme";
+import CostPanel from "./CostPanel";
 import DriftPanel from "./DriftPanel";
 import PlanPanel from "./PlanPanel";
 import { ChartFrame, ChartLegend, ChartTooltip, ErrorState, Loading, plotFrame, xAxisProps, yAxisProps, type TableSpec } from "./ui";
 
 /** "What did the desk know when it had to buy?" for one delivery day, fitted to one screen. */
-export default function DecisionView({ meta, cutoff, date, confidence, showActual }: {
+export default function DecisionView({ meta, cutoff, date, confidence, showActual, costs, onCosts, onConfidence }: {
   meta: Meta; cutoff: string; date: string; confidence: number; showActual: boolean;
+  costs: { short: number; long: number }; onCosts: (short: number, long: number) => void; onConfidence: (c: number) => void;
 }) {
   const c = useChartColors();
   const [data, setData] = useState<DayResponse | null>(null);
@@ -89,6 +91,8 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
       <div className="decision">
         <Tile className="tile decision-left">
           <PlanPanel plan={plan} day={data} error={planError} confidence={confidence} showActual={showActual} />
+          <CostPanel cutoff={cutoff} short={costs.short} long={costs.long} confidence={confidence}
+            onCosts={onCosts} onUseLevel={onConfidence} />
           <DriftPanel drift={drift} error={driftError} c={c} yAxis={yAxis} />
         </Tile>
 
@@ -135,6 +139,14 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
             <dd>Share of hours with outturn at or above the planning volume. {pooled
               ? "Backtest from Nov 2025 to Sep 2026, 7,775 hours."
               : `January 2026 hours at ${cutoff}. The longer backtest covers the 09:00 and 09:20 decision times only.`} Past performance, not a guarantee.</dd>
+            <dt>Cost of being short or long</dt>
+            <dd>Desk assumptions in £ per MWh, illustrative. Short means outturn below the planning volume, so the gap is bought late. Long means outturn above it.</dd>
+            <dt>Recommended exceedance level</dt>
+            <dd>Short cost divided by the sum of both costs. This is the newsvendor critical ratio (Arrow, Harris and Marschak 1951), used for wind by Pinson et al. (2007). It snaps to the nearest offered level, and never below P50.</dd>
+            <dt>Cost backtest</dt>
+            <dd>Hourly cost is the short cost times MWh short plus the long cost times MWh long. It uses January hours, the same residuals and the same outturn alignment as the hit rate.</dd>
+            <dt>Theory vs backtest</dt>
+            <dd>The tail levels under-cover, so the lowest-cost level in the backtest can differ from the recommended one. Both are shown. This is a decision aid, not a validated method change.</dd>
             <dt>Under-coverage</dt>
             <dd>P90 missed 16% of hours (target 10%). P95 missed 11% (target 5%). Whole-day shortfalls happen more often than the previous week suggests.</dd>
             <dt>80% range</dt>

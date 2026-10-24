@@ -7,6 +7,7 @@ import { Asleep, ChevronLeft, ChevronRight, Light } from "@carbon/icons-react";
 import { useEffect, useState } from "react";
 import { api, type Meta, type Provenance } from "./api";
 import AccuracyView from "./components/AccuracyView";
+import { DEFAULT_COSTS, validCost } from "./components/CostPanel";
 import DecisionView from "./components/DecisionView";
 import { CONFIDENCES } from "./components/PlanPanel";
 import { ErrorState, Loading } from "./components/ui";
@@ -33,6 +34,12 @@ const fmtLongDate = (iso: string) => {
 /** ISO date (YYYY-MM-DD) of a local Date, without a UTC shift. */
 const isoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+/** ?short= / ?long= in GBP/MWh, falling back to the illustrative defaults. */
+function initialCost(key: "short" | "long") {
+  const n = Number(readParam(key));
+  return readParam(key) != null && validCost(n) ? n : DEFAULT_COSTS[key];
+}
+
 function initialConfidence() {
   const c = Number(readParam("confidence"));
   return CONFIDENCES.includes(c) ? c : 80;
@@ -47,6 +54,7 @@ export default function App() {
   const [confidence, setConfidence] = useState(initialConfidence);
   // Off by default so the view shows only what was known at decision time; ?actual=1 turns it on.
   const [showActual, setShowActual] = useState(() => readParam("actual") === "1");
+  const [costs, setCosts] = useState(() => ({ short: initialCost("short"), long: initialCost("long") }));
   const [prov, setProv] = useState<Provenance | null>(null);
   const theme = useTheme();
   const [navOpen, setNavOpen] = useState(false);
@@ -71,6 +79,7 @@ export default function App() {
   useEffect(() => { if (date) writeParam("date", date); }, [date]);
   useEffect(() => { writeParam("confidence", String(confidence)); }, [confidence]);
   useEffect(() => { writeParam("actual", showActual ? "1" : null); }, [showActual]);
+  useEffect(() => { writeParam("short", String(costs.short)); writeParam("long", String(costs.long)); }, [costs]);
   useEffect(() => { writeParam("view", tab === "accuracy" ? "accuracy" : null); }, [tab]);
 
   return (
@@ -141,7 +150,8 @@ export default function App() {
         {error && <ErrorState error={error} />}
         {!meta && !error && <Loading height={400} />}
         {meta && date && (tab === "decision"
-          ? <DecisionView meta={meta} cutoff={cutoff} date={date} confidence={confidence} showActual={showActual} />
+          ? <DecisionView meta={meta} cutoff={cutoff} date={date} confidence={confidence} showActual={showActual}
+              costs={costs} onCosts={(short, long) => setCosts({ short, long })} onConfidence={setConfidence} />
           : <AccuracyView cutoff={cutoff} />)}
 
         <footer className="provenance" aria-label="Data source">

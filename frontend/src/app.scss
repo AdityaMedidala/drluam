@@ -25,6 +25,7 @@
 @use '@carbon/styles/scss/components/data-table';
 @use '@carbon/styles/scss/components/popover';
 @use '@carbon/styles/scss/components/overflow-menu';
+@use '@carbon/styles/scss/components/number-input';
 @use '@carbon/styles/scss/components/tooltip';
 @use '@carbon/styles/scss/components/notification';
 @use '@carbon/styles/scss/components/skeleton-styles';
@@ -83,7 +84,7 @@ $chrome: 48px + $bar;
   .decision .main-plot { flex: 1; min-height: 0; }
 }
 .main-plot { height: 320px; }
-.decision-left { overflow: hidden; }
+.decision-left { overflow: hidden auto; }   // an open "Costs and backtest" disclosure scrolls inside the panel
 
 // ---------------------------------------------------------------- Accuracy
 .acc-top-plot { height: 260px; }
@@ -172,3 +173,13 @@ $chrome: 48px + $bar;
 .chart-table { overflow: auto; }
 .chart-frame:fullscreen { padding: $spacing-07; background: var(--cds-layer-01); }
 .chart-frame:fullscreen > [class*="plot"] { flex: 1; height: auto; }
+
+// cost-aware exceedance level, a compact block in the decision panel
+.cost { margin-top: $spacing-05; padding-top: $spacing-05; border-top: 1px solid var(--cds-border-subtle-01); }
+.cost-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: $spacing-03; margin: $spacing-03 0 $spacing-04; }
+.cost-inputs legend { grid-column: 1 / -1; margin-bottom: $spacing-03; }
+.cost-inputs { border: 0; padding: 0; }
+.cost-rec { font-size: 0.875rem; }
+.cost-note { margin-top: $spacing-02; font-size: 0.75rem; color: var(--cds-text-secondary); }
+.cost-backtest { margin-top: $spacing-03; }
+.cost-table tr.lowest td { font-weight: 600; background: var(--cds-layer-selected-01); }
