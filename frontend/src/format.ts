@@ -46,3 +46,7 @@ export function gwAxis(values: (number | null | undefined)[]) {
   for (let t = Math.floor(lo / step) * step; t <= Math.ceil(hi / step) * step; t += step) ticks.push(t);
   return { ticks, domain: [ticks[0], ticks[ticks.length - 1]] as [number, number], tickFormatter: fmtAxisGW };
 }
+
+/** Whole GWh, for headline sentences. */
+export const fmtGWh0 = (mwh: number | null | undefined) =>
+  mwh == null ? "–" : `${Math.round(mwh / 1000).toLocaleString("en-GB")} GWh`;

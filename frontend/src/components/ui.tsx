@@ -1,53 +1,40 @@
 import type { ReactNode } from "react";
 
-/** "1,383 MW" -> 1,383 with the unit in a smaller, muted span. Strings without a known unit pass through. */
+/** "1,383 MW" -> 1,383 with the unit muted. Strings without a known unit pass through. */
 export function withUnit(text: ReactNode): ReactNode {
   if (typeof text !== "string") return text;
   const m = text.match(/^(.*?)\s?(MW|GWh|MWh|GW|%)$/);
   return m ? <>{m[1]}<span className="unit">{m[2]}</span></> : text;
 }
 
-export function StatTile({ label, value, sub, note, tone }: { label: string; value: ReactNode; sub?: ReactNode; note?: string; tone?: "accent" }) {
-  return (
-    <div className={`tile ${tone === "accent" ? "tile-accent" : ""}`}>
-      <div className="tile-label">{label}</div>
-      <div className="tile-value">{withUnit(value)}</div>
-      {sub && <div className="tile-sub">{sub}</div>}
-      {note && <div className="tile-sub tile-note" role="note">{note}</div>}
-    </div>
-  );
-}
-
-export function ChartCard({ title, subtitle, legend, children, wide }: {
-  title: string; subtitle?: ReactNode; legend?: ReactNode; children: ReactNode; wide?: boolean;
+/** A chart on the page (no card): finding as the title, optional short subtitle, the plot, a source line. */
+export function ChartBlock({ title, subtitle, source, children, className = "" }: {
+  title: ReactNode; subtitle?: ReactNode; source: string; children: ReactNode; className?: string;
 }) {
   return (
-    <section className={`card ${wide ? "card-wide" : ""}`}>
-      <header className="card-head">
-        <div>
-          <h3>{title}</h3>
-          {subtitle && <p className="muted">{subtitle}</p>}
-        </div>
-        {legend && <div className="legend">{legend}</div>}
-      </header>
-      {children}
-    </section>
+    <figure className={`chart ${className}`}>
+      <h3>{title}</h3>
+      {subtitle && <p className="chart-sub">{subtitle}</p>}
+      <div className="chart-plot">{children}</div>
+      <figcaption className="source">{source}</figcaption>
+    </figure>
   );
 }
 
-export function LegendItem({ color, label, dashed, band }: { color: string; label: string; dashed?: boolean; band?: boolean }) {
-  return (
-    <span className="legend-item">
-      {band ? (
-        <span className="swatch-band" style={{ background: color }} />
-      ) : (
-        <svg width="18" height="8" aria-hidden>
-          <line x1="0" y1="4" x2="18" y2="4" stroke={color} strokeWidth="2.5" strokeDasharray={dashed ? "4 3" : undefined} />
-        </svg>
-      )}
-      {label}
-    </span>
-  );
+export const sourceLine = (cutoff: string) => `Elexon WINDFOR/FUELHH · decisions Jan 2026 · ${cutoff} cutoff`;
+
+/** Index of the last row where `key` has a value: where a direct label goes. */
+export function lastIndex(rows: Record<string, unknown>[], key: string): number {
+  for (let i = rows.length - 1; i >= 0; i--) if (rows[i][key] != null) return i;
+  return -1;
+}
+
+/** Recharts `label` renderer: writes the series name once, just right of its last point (replaces a legend). */
+export function endLabel(text: string, color: string, at: number, dy = 4) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (p: any) => (p.index === at && p.value != null
+    ? <text key="end" x={p.x + 6} y={p.y} dy={dy} fill={color} fontSize={12} fontWeight={500}>{text}</text>
+    : <g key={p.index} />);
 }
 
 /** The one tooltip used by every chart: a title and label/value rows, optionally with a colour swatch. */
@@ -65,15 +52,6 @@ export function ChartTooltip({ title, rows }: { title: ReactNode; rows: { label:
   );
 }
 
-/** Numbered section label for the Decision view's modules ("01 Plan"). */
-export function ModuleLabel({ n, children }: { n: string; children: ReactNode }) {
-  return <h2 className="module-label"><span className="num">{n}</span> {children}</h2>;
-}
-
-export function Insight({ children }: { children: ReactNode }) {
-  return <div className="insight">{children}</div>;
-}
-
 /** Placeholder blocks shaped like the content, so the layout doesn't jump when data arrives. */
 export function Loading({ rows = 3 }: { rows?: number }) {
   return (
@@ -86,7 +64,7 @@ export function Loading({ rows = 3 }: { rows?: number }) {
 export function ErrorState({ error }: { error: string }) {
   return (
     <div className="state state-error" role="alert">
-      <strong>Couldn't load this data.</strong> Check the API is running, then reload. <span className="muted">({error})</span>
+      Couldn't load this data. Check the API is running, then reload. <span className="muted">({error})</span>
     </div>
   );
 }

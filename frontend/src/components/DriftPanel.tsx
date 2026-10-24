@@ -3,7 +3,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import type { DriftResponse } from "../api";
 import { fmtDateTime, fmtGWh, fmtMW, fmtTime, gwAxis } from "../format";
 import type { ChartColors } from "../theme";
-import { ChartCard, ChartTooltip, ErrorState, LegendItem, Loading } from "./ui";
+import { ChartBlock, ChartTooltip, ErrorState, Loading, endLabel, lastIndex, sourceLine } from "./ui";
 
 /** How the forecast for one delivery day moved across the runs published up to the cutoff. */
 export default function DriftPanel({ drift, error, c }: { drift: DriftResponse | null; error: string | null; c: ChartColors }) {
@@ -26,38 +26,36 @@ export default function DriftPanel({ drift, error, c }: { drift: DriftResponse |
   if (!drift) return <Loading rows={1} />;
   if (runs.length === 0) return <p className="muted">No forecast runs before the cutoff for this day.</p>;
 
-  const first = runs[0];
-  const decision = runs[runs.length - 1];
-  const change = decision.commonMWh - first.commonMWh;
+  const last = runs.length - 1;
+  const change = runs[last].commonMWh - runs[0].commonMWh;
+  const title = Math.abs(change) < 1000
+    ? `The forecast held steady across ${runs.length} runs`
+    : `The forecast ${change < 0 ? "fell" : "rose"} ${fmtGWh(Math.abs(change))} across ${runs.length} runs`;
 
   return (
-    <ChartCard wide
-      title="How the forecast for this day moved before the decision"
-      subtitle={<>Every WINDFOR run published up to the cutoff, for this day's hours · on the {drift.commonHours} hours all {runs.length} runs cover,
-        the forecast went from <strong>{fmtGWh(first.commonMWh)}</strong> (first run, {fmtDateTime(first.publishedUtc)}) to <strong>{fmtGWh(decision.commonMWh)}</strong> (decision run),
-        {" "}{change >= 0 ? "+" : "−"}{fmtGWh(Math.abs(change))}</>}
-      legend={<>
-        <LegendItem color={c.axis} label={`Earlier runs (${runs.length - 1})`} />
-        <LegendItem color={c.forecast} label={`Decision run (${fmtDateTime(decision.publishedUtc)})`} />
-      </>}>
-      <div className="chart-md">
+    <ChartBlock className="narrow" title={title}
+      subtitle="Grey lines are earlier runs; orange is the run the decision used."
+      source={sourceLine(drift.cutoff)}>
+      <div className="h-sm">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={rows} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+          <LineChart data={rows} margin={{ top: 8, right: 96, bottom: 0, left: 0 }}>
             <CartesianGrid stroke={c.grid} vertical={false} />
             <XAxis dataKey="time" tickFormatter={fmtTime} ticks={ticks} stroke={c.axis} tickLine={false} fontSize={12} />
-            <YAxis {...gwAxis(runs.flatMap((r) => r.hours.map((h) => h.forecastMW)))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
+            <YAxis {...gwAxis(runs.flatMap((r) => r.hours.map((h) => h.forecastMW)))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
             <Tooltip content={({ active, payload }) =>
               active && payload?.length ? (
                 <ChartTooltip title={`${fmtTime(String(payload[0].payload.time))} UK`} rows={[
                   { label: "First run", value: fmtMW(payload[0].payload.r0 as number | undefined), color: c.axis },
-                  { label: "Decision run", value: fmtMW(payload[0].payload[`r${runs.length - 1}`] as number | undefined), color: c.forecast },
+                  { label: "Decision run", value: fmtMW(payload[0].payload[`r${last}`] as number | undefined), color: c.forecast },
                 ]} />
               ) : null} />
             {runs.map((r, i) => (
               <Line key={r.publishedUtc} dataKey={`r${i}`} dot={false} isAnimationActive={false} connectNulls
                 stroke={r.isDecisionRun ? c.forecast : c.axis}
                 strokeWidth={r.isDecisionRun ? 2 : 1}
-                strokeOpacity={r.isDecisionRun ? 1 : 0.25 + 0.5 * (i / Math.max(1, runs.length - 1))} />
+                strokeOpacity={r.isDecisionRun ? 1 : 0.2 + 0.45 * (i / Math.max(1, last))}
+                label={i === 0 ? endLabel("First run", c.axis, lastIndex(rows, "r0"), -6)
+                  : r.isDecisionRun ? endLabel("Decision run", c.forecast, lastIndex(rows, `r${i}`)) : undefined} />
             ))}
           </LineChart>
         </ResponsiveContainer>
@@ -76,6 +74,6 @@ export default function DriftPanel({ drift, error, c }: { drift: DriftResponse |
           </tbody>
         </table>
       </details>
-    </ChartCard>
+    </ChartBlock>
   );
 }

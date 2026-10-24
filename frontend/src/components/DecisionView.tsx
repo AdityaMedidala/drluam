@@ -3,12 +3,12 @@ import {
   Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { api, type DayResponse, type DriftResponse, type Meta, type PlanResponse } from "../api";
-import { gwAxis, fmtDate, fmtDateTime, fmtGWh, fmtMW, fmtPct, fmtTime, shiftDate } from "../format";
+import { gwAxis, fmtGWh, fmtMW, fmtPct, fmtTime, shiftDate } from "../format";
 import { useChartColors } from "../theme";
 import { readParam, writeParam } from "../url";
 import DriftPanel from "./DriftPanel";
 import PlanPanel, { CONFIDENCES } from "./PlanPanel";
-import { ChartCard, ChartTooltip, ErrorState, LegendItem, Loading, ModuleLabel, StatTile } from "./ui";
+import { ChartBlock, ChartTooltip, ErrorState, Loading, endLabel, lastIndex, sourceLine } from "./ui";
 
 function initialDate(meta: Meta) {
   const d = readParam("date");
@@ -73,18 +73,21 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
   );
   const hasCorrection = data?.correctionRatio != null;
   const coverage = data?.bandCoverage != null ? fmtPct(data.bandCoverage) : "–";
+  const shown = (data?.series ?? []).map((p) => (hasCorrection ? p.adjusted : p.forecast)).filter((v): v is number => v != null);
+  const gw = (mw: number) => (mw / 1000).toFixed(1);
+  const ratio = data?.correctionRatio;
 
   return (
     <div className="view">
       <div className="controls">
         <div className="date-nav">
-          <button onClick={() => setDate(shiftDate(date, -1))} disabled={date <= meta.firstDelivery} aria-label="Previous day">‹</button>
-          <label>
-            <span className="muted">Delivery day</span>
+          <button className="btn" onClick={() => setDate(shiftDate(date, -1))} disabled={date <= meta.firstDelivery} aria-label="Previous day">‹</button>
+          <label className="field">
+            Delivery day
             <input type="date" value={date} min={meta.firstDelivery} max={meta.lastDelivery}
               onChange={(e) => e.target.value && setDate(e.target.value)} />
           </label>
-          <button onClick={() => setDate(shiftDate(date, 1))} disabled={date >= meta.lastDelivery} aria-label="Next day">›</button>
+          <button className="btn" onClick={() => setDate(shiftDate(date, 1))} disabled={date >= meta.lastDelivery} aria-label="Next day">›</button>
         </div>
         <label className="toggle">
           <input type="checkbox" checked={showActual} onChange={(e) => setShowActual(e.target.checked)} />
@@ -92,56 +95,34 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
         </label>
       </div>
 
-      {data && !error && (
-        <p className="decision-context">
-          Decision for <strong>{fmtDate(data.date)}</strong>
-          {" · "}made {data.decisionTimeUtc ? fmtDateTime(data.decisionTimeUtc) : "–"} UK
-          {" · "}<span title="Hours from the forecast's publish time to the first and last delivery hour of the day">
-            using forecast published {data.forecastPublishedUtc ? fmtTime(data.forecastPublishedUtc) : "–"}
-            {data.horizonHours ? ` (${data.horizonHours[0]}–${data.horizonHours[1]} h ahead)` : ""}
-          </span>
-        </p>
-      )}
-
-      <section className="module">
-        <ModuleLabel n="01">Plan</ModuleLabel>
-        <PlanPanel plan={plan} day={data} error={planError} confidence={confidence} onConfidence={setConfidence} />
-      </section>
+      <PlanPanel plan={plan} day={data} error={planError} confidence={confidence} onConfidence={setConfidence} />
 
       {error && <ErrorState error={error} />}
-      {!data && !error && <Loading />}
+      {!data && !error && <Loading rows={2} />}
       {data && !error && (
         <>
-          <section className="module">
-          <ModuleLabel n="02">Forecast</ModuleLabel>
-          {showActual && (
-            <div className="tiles">
-              <StatTile label="What actually happened"
-                value={fmtGWh(data.summary.actualEnergyMWh)}
-                sub={<>Sum of half-hourly FUELHH wind output · average hourly error (MAE) this day: raw {fmtMW(data.summary.maeRaw)} · adjusted {fmtMW(data.summary.maeAdjusted)}</>} />
-            </div>
-          )}
-
-          <ChartCard wide
-            title="What the desk knew at the cutoff"
-            subtitle={<>Forecast available at decision time, hourly · band = adjusted forecast + P10–P90 of the last 7 days' misses (actual − adjusted forecast) · in January the actual landed inside it in <strong>{coverage}</strong> of hours (not 80%)</>}
-            legend={<>
-              <LegendItem color={c.forecast} label="Raw forecast" />
-              {hasCorrection && <LegendItem color={c.adjusted} label="Adjusted forecast" />}
-              {hasCorrection && <LegendItem color={c.band} label={`Band (held ${coverage} of hours)`} band />}
-              {showActual && <LegendItem color={c.actual} label="Actual (half-hourly)" />}
-            </>}>
-            <div className="chart-lg">
+          <ChartBlock
+            title={shown.length ? `${hasCorrection ? "Adjusted" : "Raw"} forecast ranges ${gw(Math.min(...shown))}–${gw(Math.max(...shown))} GW` : "No forecast for this day"}
+            subtitle={showActual
+              ? <>In hindsight, {fmtGWh(data.summary.actualEnergyMWh)} of wind came in.</>
+              : hasCorrection ? <>Shaded range held the actual in {coverage} of January hours.</> : undefined}
+            source={sourceLine(cutoff)}>
+            <div className="h-lg">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+                <ComposedChart data={chartData} margin={{ top: 8, right: 112, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke={c.grid} vertical={false} />
                   <XAxis dataKey="time" tickFormatter={fmtTime} ticks={sixHourTicks} stroke={c.axis} tickLine={false} fontSize={12} />
-                  <YAxis {...gwAxis(chartData.flatMap((p) => [p.forecast, p.high, showActual ? p.actual : null]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
+                  <YAxis {...gwAxis(chartData.flatMap((p) => [p.forecast, p.high, showActual ? p.actual : null]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
                   <Tooltip content={<DayTooltip showActual={showActual} c={c} />} />
-                  {hasCorrection && <Area dataKey="band" stroke="none" fill={c.band} fillOpacity={0.14} connectNulls isAnimationActive={false} />}
-                  <Line dataKey="forecast" stroke={c.forecast} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
-                  {hasCorrection && <Line dataKey="adjusted" stroke={c.adjusted} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />}
-                  {showActual && <Line dataKey="actual" stroke={c.actual} strokeWidth={1.5} dot={false} isAnimationActive={false} />}
+                  {hasCorrection && <Area dataKey="band" stroke="none" fill={c.band} fillOpacity={c.bandOpacity} connectNulls isAnimationActive={false} />}
+                  {hasCorrection && <Line dataKey="low" stroke="none" dot={false} connectNulls isAnimationActive={false} legendType="none"
+                    label={endLabel("P10–P90 range", c.adjusted, lastIndex(chartData, "low"))} />}
+                  <Line dataKey="forecast" stroke={c.forecast} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false}
+                    label={endLabel("Raw forecast", c.forecast, lastIndex(chartData, "forecast"), -4)} />
+                  {hasCorrection && <Line dataKey="adjusted" stroke={c.adjusted} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false}
+                    label={endLabel("Adjusted", c.adjusted, lastIndex(chartData, "adjusted"), 10)} />}
+                  {showActual && <Line dataKey="actual" stroke={c.actual} strokeWidth={1.5} dot={false} isAnimationActive={false}
+                    label={endLabel("Actual", c.actual, lastIndex(chartData, "actual"))} />}
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -159,15 +140,26 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
                 </tbody>
               </table>
             </details>
-          </ChartCard>
-          </section>
+          </ChartBlock>
 
-          <section className="module">
-            <ModuleLabel n="03">Forecast drift</ModuleLabel>
-            <DriftPanel drift={drift} error={driftError} c={c} />
-          </section>
+          <DriftPanel drift={drift} error={driftError} c={c} />
         </>
       )}
+
+      <details className="section methodology">
+        <summary>Methodology</summary>
+        <ul>
+          <li><strong>Raw forecast:</strong> for each hour, the latest Elexon WINDFOR forecast published at or before the decision cutoff ({cutoff} UK the day before). Later forecasts are ignored: the desk couldn't have seen them in time.</li>
+          <li><strong>Expected (adjusted):</strong> raw forecast × the ratio of actual to forecast wind over the previous 7 days, using only actuals already known at the cutoff{ratio != null ? <> (for this day: {ratio.toFixed(2)})</> : null}.</li>
+          <li><strong>Plan on P{confidence}:</strong> each hour's adjusted forecast + the {100 - confidence}th percentile of the last 7 days' hourly misses (actual − adjusted, positive or negative), never below 0, summed over the day. The difference from the raw forecast is raw − plan.</li>
+          <li><strong>Held:</strong> the share of past hours whose actual came in at or above the plan. Nov 2025 – Sep 2026 (7,775 hours) comes from the same method run offline on those months and is shown at the 09:00/09:20 cutoffs only; January 2026 is this app's data. The cautious plans over-promise: P90 was missed in 16% of hours (promised 10%), P95 in 11% (promised 5%), because whole-day shortfalls are more frequent than the previous week's errors suggest. Past results, not a guarantee.</li>
+          <li><strong>Range:</strong> the adjusted forecast + the 10th–90th percentile of the same misses.</li>
+          <li><strong>Forecast drift:</strong> every WINDFOR run published up to the cutoff for this day's hours; runs are compared on the hours they all cover, because runs two days ahead stop short of the last hours.</li>
+          <li><strong>Hindsight:</strong> FUELHH metered wind output, half-hourly, hidden by default so the view shows only what was known at decision time.</li>
+          <li>Most of the average gap matches wind curtailment (accepted bids) — see docs/curtailment-check.md; that analysis uses data outside this app.</li>
+          <li>Times are UK local time. Energy totals: hourly MW × 1 h (forecasts), half-hourly MW × 0.5 h (actuals).</li>
+        </ul>
+      </details>
     </div>
   );
 }

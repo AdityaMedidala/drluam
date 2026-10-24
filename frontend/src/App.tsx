@@ -43,16 +43,16 @@ export default function App() {
         </div>
         <div className="topbar-controls">
         {meta && (
-          <label className="cutoff">
-            <span className="muted">Decision cutoff (UK, day before)</span>
+          <label className="field">
+            Decision cutoff (UK, day before)
             <select value={cutoff} onChange={(e) => setCutoff(e.target.value)}>
               {meta.cutoffOptions.map((o) => <option key={o} value={o}>{o}{GATES[o] ? ` (${GATES[o]})` : ""}</option>)}
             </select>
           </label>
         )}
-        <button type="button" className="theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        <button type="button" className="btn" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>
-          {theme === "dark" ? "☀ Light" : "☾ Dark"}
+          {theme === "dark" ? "Light" : "Dark"}
         </button>
         </div>
       </header>
@@ -70,11 +70,11 @@ export default function App() {
 
       <footer className="provenance" aria-label="Data provenance">
         <span>Source: Elexon BMRS (WINDFOR, FUELHH)</span>
-        {prov && <span>· snapshot fetched {new Date(prov.fetchedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>}
+        {prov && <span> · snapshot fetched {new Date(prov.fetchedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>}
         {prov && (prov.allVerified
-          ? <span className="ok">· checksums verified ✓</span>
-          : <span className="bad">· checksum mismatch ✗ ({prov.files.filter((f) => !f.verified).map((f) => f.file).join(", ")})</span>)}
-        <span>· times in UK local time</span>
+          ? <span> · checksums match</span>
+          : <span className="bad"> · checksum mismatch: {prov.files.filter((f) => !f.verified).map((f) => f.file).join(", ")}</span>)}
+        <span> · times in UK local time</span>
       </footer>
     </div>
   );

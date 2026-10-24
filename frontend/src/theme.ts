@@ -10,15 +10,17 @@ const LIGHT = {
   grid: "#ecebe7",
   axis: "#6f6c64",
   surface: "#ffffff",
+  bandOpacity: 0.14,
 };
 const DARK = {
   actual: "#f0efec",
   forecast: "#d95926",
   adjusted: "#3987e5",
   band: "#3987e5",
-  grid: "#2a2a27",
-  axis: "#a3a29b",
-  surface: "#1a1a19",
+  grid: "#2a2a28",
+  axis: "#a09e96",
+  surface: "#141413",
+  bandOpacity: 0.2,   // tuned for the dark page, not inverted: lower glow, still visible
 };
 export type ChartColors = typeof LIGHT;
 export type Theme = "light" | "dark";
