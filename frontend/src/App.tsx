@@ -1,81 +1,142 @@
+import {
+  ContentSwitcher, DatePicker, DatePickerInput, Dropdown, Header, HeaderGlobalAction, HeaderGlobalBar,
+  HeaderMenuButton, HeaderMenuItem, HeaderName, HeaderNavigation, HeaderSideNavItems, IconButton, SideNav,
+  SideNavItems, Switch, Theme, Toggle,
+} from "@carbon/react";
+import { Asleep, ChevronLeft, ChevronRight, Light } from "@carbon/icons-react";
 import { useEffect, useState } from "react";
 import { api, type Meta, type Provenance } from "./api";
 import AccuracyView from "./components/AccuracyView";
 import DecisionView from "./components/DecisionView";
+import { CONFIDENCES } from "./components/PlanPanel";
 import { ErrorState, Loading } from "./components/ui";
+import { shiftDate } from "./format";
 import { setTheme, useTheme } from "./theme";
 import { readParam, writeParam } from "./url";
 
 // GB day-ahead auction gate closures (UK time).
 const GATES: Record<string, string> = { "09:20": "EPEX gate", "09:50": "N2EX gate" };
+const cutoffLabel = (o: string | null | undefined) => (o ? `${o}${GATES[o] ? ` (${GATES[o]})` : ""}` : "");
 
 type Tab = "decision" | "accuracy";
+
+/** "2026-01-28" -> "28/01/2026", the DatePicker's dateFormat (it takes min/max as strings in that format). */
+const dmy = (iso: string) => iso.split("-").reverse().join("/");
+
+/** ISO date (YYYY-MM-DD) of a local Date, without a UTC shift. */
+const isoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+function initialConfidence() {
+  const c = Number(readParam("confidence"));
+  return CONFIDENCES.includes(c) ? c : 80;
+}
 
 export default function App() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("decision");
+  const [tab, setTab] = useState<Tab>(readParam("view") === "accuracy" ? "accuracy" : "decision");
   const [cutoff, setCutoff] = useState("09:20");
+  const [date, setDate] = useState<string | null>(null);
+  const [confidence, setConfidence] = useState(initialConfidence);
+  // Off by default so the view shows only what was known at decision time; ?actual=1 turns it on.
+  const [showActual, setShowActual] = useState(() => readParam("actual") === "1");
   const [prov, setProv] = useState<Provenance | null>(null);
   const theme = useTheme();
+  const [navOpen, setNavOpen] = useState(false);
+  const go = (t: Tab) => (e: React.MouseEvent) => { e.preventDefault(); setTab(t); setNavOpen(false); };
+  const navItems = (["decision", "accuracy"] as Tab[]).map((t) => (
+    <HeaderMenuItem key={t} href="#" isActive={tab === t} aria-current={tab === t ? "page" : undefined} onClick={go(t)}>
+      {t === "decision" ? "Decision" : "Accuracy"}
+    </HeaderMenuItem>
+  ));
 
   useEffect(() => {
     api.meta().then((m) => {
-      const fromUrl = readParam("cutoff");
-      setCutoff(fromUrl && m.cutoffOptions.includes(fromUrl) ? fromUrl : m.defaultCutoff);
+      const c = readParam("cutoff");
+      setCutoff(c && m.cutoffOptions.includes(c) ? c : m.defaultCutoff);
+      const d = readParam("date");
+      setDate(d && d >= m.firstDelivery && d <= m.lastDelivery ? d : m.lastDelivery);
       setMeta(m);
     }).catch((e) => setError(String(e)));
+    api.provenance().then(setProv).catch(() => setProv(null));
   }, []);
   useEffect(() => { if (meta) writeParam("cutoff", cutoff); }, [meta, cutoff]);
-  useEffect(() => { api.provenance().then(setProv).catch(() => setProv(null)); }, []);
+  useEffect(() => { if (date) writeParam("date", date); }, [date]);
+  useEffect(() => { writeParam("confidence", String(confidence)); }, [confidence]);
+  useEffect(() => { writeParam("actual", showActual ? "1" : null); }, [showActual]);
+  useEffect(() => { writeParam("view", tab === "accuracy" ? "accuracy" : null); }, [tab]);
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <span className="logo" aria-hidden>
-            <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 12 L12 3 M12 12 L4.5 16.5 M12 12 L19.5 16.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /><circle cx="12" cy="12" r="2" fill="currentColor" /></svg>
-          </span>
-          <div>
-            <h1>Wind Forecast Desk</h1>
-            <p className="muted">GB national wind · day-ahead purchase decisions · January 2026 pilot</p>
+    <Theme theme={theme === "dark" ? "g100" : "g10"} className="app-theme">
+      <Header aria-label="Wind Forecast Desk">
+        {/* Below Carbon's large breakpoint the header navigation hides; the menu button opens the same items. */}
+        <HeaderMenuButton aria-label={navOpen ? "Close menu" : "Open menu"} isActive={navOpen} isCollapsible
+          onClick={() => setNavOpen(!navOpen)} />
+        <HeaderName href="#" prefix="">Wind Forecast Desk</HeaderName>
+        <HeaderNavigation aria-label="Views">{navItems}</HeaderNavigation>
+        <SideNav aria-label="Views" expanded={navOpen} isPersistent={false} onOverlayClick={() => setNavOpen(false)}>
+          <SideNavItems><HeaderSideNavItems>{navItems}</HeaderSideNavItems></SideNavItems>
+        </SideNav>
+        <HeaderGlobalBar>
+          <HeaderGlobalAction aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`} tooltipAlignment="end"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+            {theme === "dark" ? <Light size={20} /> : <Asleep size={20} />}
+          </HeaderGlobalAction>
+        </HeaderGlobalBar>
+      </Header>
+
+      {meta && date && (
+        <div className="control-bar" role="toolbar" aria-label="View controls">
+          {tab === "decision" && (
+            <div className="date-group">
+              <IconButton kind="ghost" size="md" label="Previous day" disabled={date <= meta.firstDelivery}
+                onClick={() => setDate(shiftDate(date, -1))}><ChevronLeft /></IconButton>
+              <DatePicker datePickerType="single" dateFormat="d/m/Y" value={new Date(`${date}T12:00:00`)}
+                minDate={dmy(meta.firstDelivery)} maxDate={dmy(meta.lastDelivery)}
+                onChange={(dates: Date[]) => { if (dates[0]) setDate(isoLocal(dates[0])); }}>
+                <DatePickerInput id="delivery-day" labelText="Delivery day" placeholder="dd/mm/yyyy" size="md" />
+              </DatePicker>
+              <IconButton kind="ghost" size="md" label="Next day" disabled={date >= meta.lastDelivery}
+                onClick={() => setDate(shiftDate(date, 1))}><ChevronRight /></IconButton>
+            </div>
+          )}
+          <div style={{ width: 220 }}>
+            <Dropdown id="cutoff" titleText="Decision cutoff (UK, day before)" label="Cutoff" size="md"
+              items={meta.cutoffOptions} itemToString={cutoffLabel} selectedItem={cutoff}
+              onChange={({ selectedItem }: { selectedItem: string | null }) => selectedItem && setCutoff(selectedItem)} />
           </div>
+          {tab === "decision" && (
+            <>
+              <div>
+                <div className="cds--label" id="confidence-label">Plan confidence</div>
+                <ContentSwitcher size="md" aria-labelledby="confidence-label" selectedIndex={CONFIDENCES.indexOf(confidence)}
+                  onChange={({ index }) => index != null && setConfidence(CONFIDENCES[index])}>
+                  {CONFIDENCES.map((c) => <Switch key={c} name={String(c)} text={`P${c}`} />)}
+                </ContentSwitcher>
+              </div>
+              <Toggle id="show-actual" size="sm" labelText="Show actual" labelA="Off" labelB="On"
+                toggled={showActual} onToggle={(v: boolean) => setShowActual(v)} />
+            </>
+          )}
         </div>
-        <div className="topbar-controls">
-        {meta && (
-          <label className="field">
-            Decision cutoff (UK, day before)
-            <select value={cutoff} onChange={(e) => setCutoff(e.target.value)}>
-              {meta.cutoffOptions.map((o) => <option key={o} value={o}>{o}{GATES[o] ? ` (${GATES[o]})` : ""}</option>)}
-            </select>
-          </label>
-        )}
-        <button type="button" className="btn" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>
-          {theme === "dark" ? "Light" : "Dark"}
-        </button>
-        </div>
-      </header>
+      )}
 
-      <nav className="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === "decision"} onClick={() => setTab("decision")}>Forecast at decision time</button>
-        <button role="tab" aria-selected={tab === "accuracy"} onClick={() => setTab("accuracy")}>Forecast accuracy</button>
-      </nav>
-
-      <main>
+      <main className="page" style={meta ? undefined : { marginTop: 48 }}>
         {error && <ErrorState error={error} />}
-        {!meta && !error && <Loading />}
-        {meta && (tab === "decision" ? <DecisionView meta={meta} cutoff={cutoff} /> : <AccuracyView cutoff={cutoff} />)}
-      </main>
+        {!meta && !error && <Loading height={400} />}
+        {meta && date && (tab === "decision"
+          ? <DecisionView meta={meta} cutoff={cutoff} date={date} confidence={confidence} showActual={showActual} />
+          : <AccuracyView cutoff={cutoff} />)}
 
-      <footer className="provenance" aria-label="Data provenance">
-        <span>Source: Elexon BMRS (WINDFOR, FUELHH)</span>
-        {prov && <span> · snapshot fetched {new Date(prov.fetchedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>}
-        {prov && (prov.allVerified
-          ? <span> · checksums match</span>
-          : <span className="bad"> · checksum mismatch: {prov.files.filter((f) => !f.verified).map((f) => f.file).join(", ")}</span>)}
-        <span> · times in UK local time</span>
-      </footer>
-    </div>
+        <footer className="provenance" aria-label="Data provenance">
+          Source: Elexon BMRS (WINDFOR, FUELHH)
+          {prov && <> · snapshot fetched {new Date(prov.fetchedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</>}
+          {prov && (prov.allVerified
+            ? <> · checksums match</>
+            : <span className="bad"> · checksum mismatch: {prov.files.filter((f) => !f.verified).map((f) => f.file).join(", ")}</span>)}
+          {" "}· times in UK local time
+        </footer>
+      </main>
+    </Theme>
   );
 }

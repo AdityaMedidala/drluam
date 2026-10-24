@@ -1,3 +1,4 @@
+import { InlineNotification, SkeletonPlaceholder } from "@carbon/react";
 import type { ReactNode } from "react";
 
 /** "1,383 MW" -> 1,383 with the unit muted. Strings without a known unit pass through. */
@@ -5,20 +6,6 @@ export function withUnit(text: ReactNode): ReactNode {
   if (typeof text !== "string") return text;
   const m = text.match(/^(.*?)\s?(MW|GWh|MWh|GW|%)$/);
   return m ? <>{m[1]}<span className="unit">{m[2]}</span></> : text;
-}
-
-/** A chart on the page (no card): finding as the title, optional short subtitle, the plot, a source line. */
-export function ChartBlock({ title, subtitle, source, children, className = "" }: {
-  title: ReactNode; subtitle?: ReactNode; source: string; children: ReactNode; className?: string;
-}) {
-  return (
-    <figure className={`chart ${className}`}>
-      <h3>{title}</h3>
-      {subtitle && <p className="chart-sub">{subtitle}</p>}
-      <div className="chart-plot">{children}</div>
-      <figcaption className="source">{source}</figcaption>
-    </figure>
-  );
 }
 
 export const sourceLine = (cutoff: string) => `Elexon WINDFOR/FUELHH · decisions Jan 2026 · ${cutoff} cutoff`;
@@ -37,13 +24,13 @@ export function endLabel(text: string, color: string, at: number, dy = 4) {
     : <g key={p.index} />);
 }
 
-/** The one tooltip used by every chart: a title and label/value rows, optionally with a colour swatch. */
+/** The one tooltip used by every chart (Carbon data-viz style): a title and label/value rows with swatches. */
 export function ChartTooltip({ title, rows }: { title: ReactNode; rows: { label: string; value: ReactNode; color?: string }[] }) {
   return (
-    <div className="tooltip">
-      <div className="tooltip-title">{title}</div>
+    <div className="chart-tooltip">
+      <div className="t-title">{title}</div>
       {rows.map((r) => (
-        <div key={r.label} className="tooltip-row">
+        <div key={r.label} className="t-row">
           <span>{r.color && <span className="swatch" style={{ background: r.color }} aria-hidden />}{r.label}</span>
           <strong>{r.value}</strong>
         </div>
@@ -52,19 +39,17 @@ export function ChartTooltip({ title, rows }: { title: ReactNode; rows: { label:
   );
 }
 
-/** Placeholder blocks shaped like the content, so the layout doesn't jump when data arrives. */
-export function Loading({ rows = 3 }: { rows?: number }) {
+export function Loading({ height = 120 }: { height?: number }) {
   return (
-    <div className="skeleton" role="status" aria-live="polite" aria-label="Loading">
-      {Array.from({ length: rows }, (_, i) => <div key={i} className="skeleton-bar" />)}
+    <div role="status" aria-live="polite" aria-label="Loading">
+      <SkeletonPlaceholder style={{ width: "100%", height }} />
     </div>
   );
 }
 
 export function ErrorState({ error }: { error: string }) {
   return (
-    <div className="state state-error" role="alert">
-      Couldn't load this data. Check the API is running, then reload. <span className="muted">({error})</span>
-    </div>
+    <InlineNotification kind="error" lowContrast hideCloseButton role="alert"
+      title="Couldn't load this data." subtitle={`Check the API is running, then reload. (${error})`} />
   );
 }
