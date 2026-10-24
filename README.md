@@ -37,7 +37,7 @@ flowchart LR
   API --> UI[React + Recharts<br/>Decision view / Accuracy view]
 ```
 
-**Picking the decision forecast.** GB day-ahead auctions close around 09:20–09:50 UK time on the day before delivery. For every target hour on delivery day D, the app uses the **latest WINDFOR forecast published at or before the cutoff on D−1** (default 09:00 UK, adjustable in the UI). Forecasts published later are ignored, because the desk could not have used them. Using the newest forecast instead would overstate accuracy.
+**Picking the decision forecast.** GB day-ahead auctions close around 09:20–09:50 UK time on the day before delivery. For every target hour on delivery day D, the app uses the **latest WINDFOR forecast published at or before the cutoff on D−1** (default 09:00 UK, adjustable in the UI). The selector includes 09:20 (EPEX) and 09:50 (N2EX) gate closures. In January, 09:20 picks the same forecasts as 09:00. 09:50 picks up a later run, which moves raw MAE from 2,022 to 1,996 MW and band coverage from 69.1% to 69.4%. Forecasts published later are ignored, because the desk could not have used them. Using the newest forecast instead would overstate accuracy.
 
 **Scope.** "Decisions made in January 2026" means delivery days **2 Jan – 1 Feb 2026**.
 

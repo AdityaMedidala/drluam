@@ -21,7 +21,7 @@ from . import analysis as an
 from .data import FIRST_DELIVERY, LAST_DELIVERY, load_actuals, load_forecasts
 
 DEFAULT_CUTOFF = "09:00"
-CUTOFF_OPTIONS = ["06:00", "08:00", "09:00", "09:30", "10:00", "11:00"]
+CUTOFF_OPTIONS = ["06:00", "08:00", "09:00", "09:20", "09:30", "09:50", "10:00", "11:00"]
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):

@@ -29,6 +29,15 @@ def test_day_rejects_out_of_scope_date():
     assert client.get("/api/day", params={"date": "2026-03-01"}).status_code == 400
 
 
+@pytest.mark.parametrize("cutoff", ["09:20", "09:50"])
+def test_auction_gate_closures_are_offered(cutoff):
+    # GB day-ahead auctions close ~09:20 (EPEX) and ~09:50 (N2EX) UK time.
+    assert cutoff in client.get("/api/meta").json()["cutoffOptions"]
+    r = client.get("/api/day", params={"date": "2026-01-15", "cutoff": cutoff})
+    assert r.status_code == 200
+    assert r.json()["decisionTimeUtc"] == f"2026-01-14T{cutoff}:00Z"
+
+
 @pytest.mark.parametrize("cutoff", ["nine", "09:15", "25:00"])
 def test_cutoff_outside_options_is_422(cutoff):
     assert client.get("/api/accuracy", params={"cutoff": cutoff}).status_code == 422
