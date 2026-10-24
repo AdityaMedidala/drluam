@@ -152,6 +152,10 @@ $chrome: 48px + $bar;
 .cds--content-switcher-btn:focus:not(:focus-visible),
 .cds--date-picker__input:focus:not(:focus-visible),
 .cds--list-box__field:focus:not(:focus-visible) { box-shadow: none !important; }
+// header tabs draw their focus ring as a border, not an outline
+.cds--header__menu-item:focus:not(:focus-visible) { border-color: transparent !important; }
+.cds--content-switcher-btn:focus:not(:focus-visible)::after { box-shadow: none !important; }
+.cds--toggle__button:focus:not(:focus-visible) + .cds--toggle__label .cds--toggle__switch { box-shadow: none !important; }
 // "Show outturn" laid out like the other fields: label on top, control centred in a 40px row
 .toggle-field { display: flex; flex-direction: column; }
 .toggle-field .cds--toggle { display: flex; align-items: center; height: 40px; }

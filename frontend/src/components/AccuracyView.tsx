@@ -182,7 +182,8 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.byHorizon} accessibilityLayer margin={{ top: 8, right: 16, bottom: 0, left: 4 }}>
                   <CartesianGrid stroke={c.grid} />
-                  <XAxis dataKey="group" tickFormatter={(g) => (g.startsWith("<0h") ? "elapsed" : g)} interval={0} {...ax} />
+                  {/* padding keeps the first and last category labels ("elapsed", "42-48h") inside the plot */}
+                  <XAxis dataKey="group" tickFormatter={(g) => (g.startsWith("<0h") ? "elapsed" : g)} interval={0} padding={{ left: 24, right: 24 }} {...ax} />
                   <YAxis {...gwAxis(data.byHorizon.flatMap((r) => [r.errorMae, r.errorBias]))} {...yAxisProps(c)} />
                   <Customized component={plotFrame(c)} />
                   <Tooltip content={<GroupTooltip c={c} rawOnly />} />
