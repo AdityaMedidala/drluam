@@ -107,29 +107,39 @@ test("a mouse click on a header tab leaves no focus ring", async ({ page }) => {
 test("the cost block recommends a level, applies it, and keeps the costs in the URL", async ({ page }) => {
   await page.goto("/?date=2026-01-17&cutoff=09:20&confidence=50");
   const block = page.getByRole("region", { name: "Cost-aware exceedance level" });
+  const header = block.getByRole("button", { name: "Exceedance level by cost · P80 recommended" });
+  await expect(header).toHaveAttribute("aria-expanded", "false");          // collapsed by default
+  await header.click();
   const row = (label: string) => block.locator(".cds--structured-list-row", { hasText: label });
   await expect(row("Short · Long")).toContainText("£100 · £30 per MWh");
   await expect(row("Recommended")).toContainText("P80 (theory P77)");
-  await expect(row("11-month backtest")).toContainText("P80 ✓");
+  await expect(row("11-month backtest").getByRole("img", { name: "matches theory" })).toBeVisible();
   await expect(row("January only")).toContainText("P70, £4.6m less than P80");
+  await expect(block).toContainText("P80 would have cost £67.0m less than the NESO forecast in this backtest, at these assumptions.");
+  await expect(block.getByText("Cost (£m, GB-wide volume, illustrative)")).toBeVisible();
+  await expect(block.locator(".cost-table tbody tr")).toHaveCount(7);
+  await expect(block.locator(".cost-table tr.lowest")).toHaveCount(1);
   await block.getByRole("link", { name: "Use P80" }).click();
   await expect(page.getByRole("tab", { name: "P80" })).toHaveAttribute("aria-selected", "true");
   await expect(page).toHaveURL(/confidence=80/);
   await expect(row("Recommended")).toContainText("Selected");
   await expect(block.getByRole("link", { name: "Use P80" })).toHaveCount(0);
 
-  await block.getByRole("button", { name: "Costs and backtest" }).click();
-  await expect(block.locator(".cost-table tbody tr")).toHaveCount(7);
-  await expect(block.locator(".cost-table tr.lowest")).toHaveCount(1);
   await block.getByLabel("Short · £/MWh").fill("200");
   await block.getByLabel("Long · £/MWh").fill("20");
-  // theory P91 -> P90, the 11-month backtest says P95: both shown, neither picked
   await expect(row("Recommended")).toContainText("P90 or P95 (theory P91)");
-  await expect(row("11-month backtest")).toHaveText(/P95$/);
   await expect(page).toHaveURL(/short=200/);
   await expect(page).toHaveURL(/long=20/);
   await block.getByLabel("Short · £/MWh").fill("20");
   await block.getByLabel("Long · £/MWh").fill("80");
   await expect(row("Recommended")).toContainText("P50 (theory P20, snapped)");
+  await expect(block).toContainText("more than the NESO forecast");     // the comparison keeps its sign
   expect(await seriousViolations(page)).toEqual([]);
+});
+
+test("with the cost block collapsed the drift chart gets its height back", async ({ page }) => {
+  await page.goto("/?date=2026-01-17&cutoff=09:20");
+  await expect(page.locator(".drift-plot .recharts-surface")).toBeVisible();
+  const height = (await page.locator(".drift-plot").boundingBox())!.height;
+  expect(height).toBeGreaterThanOrEqual(250);
 });

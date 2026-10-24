@@ -146,7 +146,8 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
             <dt>Cost backtest</dt>
             <dd>Hourly cost is the short cost times MWh short plus the long cost times MWh long. It uses January hours, the same residuals and the same outturn alignment as the hit rate.</dd>
             <dt>Theory vs backtest</dt>
-            <dd>The tail levels under-cover, so the lowest-cost level in the backtest can differ from the recommended one. Both are shown. This is a decision aid, not a validated method change.</dd>
+            <dd>The backtest best level can differ from theory. Under-covering tails push it up. Single months are noisy, and the cost curve is flat near the optimum. This is a decision aid, not a validated method change.</dd>
+            <dd>Most of the saving comes from the bias correction itself. Level choice adds a smaller refinement.</dd>
             <dt>Under-coverage</dt>
             <dd>P90 missed 16% of hours (target 10%). P95 missed 11% (target 5%). Whole-day shortfalls happen more often than the previous week suggests.</dd>
             <dt>80% range</dt>
