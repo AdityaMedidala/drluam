@@ -1,0 +1,11 @@
+{
+  "fetchedAt": "2026-10-24T08:54:03+00:00",
+  "source": "NESO data portal, dataset 'Constraint Breakdown Costs and Volume' (constraint-breakdown), resource 'Constraint Breakdown 2025-2026'",
+  "url": "https://api.neso.energy/dataset/fb56b46e-cef3-4eb8-9294-0ca19769b7eb/resource/6afe1c2b-6d70-4e76-8e74-0952b0a2beab/download/constraint-breakdown-2025-2026.csv",
+  "fetch": "curl -sL <url> -o analysis/neso/constraint-breakdown-2025-2026.csv",
+  "resourceLastModified": "2026-04-07T09:49:30",
+  "rows": 364,
+  "units": "daily cost (GBP) and volume (MWh) by constraint type; negative volume = generation turned down",
+  "file": "constraint-breakdown-2025-2026.csv",
+  "sha256": "5e8f80621c79237f0f370485294dfb3f2f0a794f73ff01a0b0d1667bbe621992"
+}
