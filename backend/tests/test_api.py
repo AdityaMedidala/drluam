@@ -1,4 +1,5 @@
 """Smoke tests against the real January snapshot in data/."""
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -27,8 +28,19 @@ def test_day_rejects_out_of_scope_date():
     assert client.get("/api/day", params={"date": "2026-03-01"}).status_code == 400
 
 
-def test_bad_cutoff_is_400():
-    assert client.get("/api/accuracy", params={"cutoff": "nine"}).status_code == 400
+@pytest.mark.parametrize("cutoff", ["nine", "09:15", "25:00"])
+def test_cutoff_outside_options_is_422(cutoff):
+    assert client.get("/api/accuracy", params={"cutoff": cutoff}).status_code == 422
+    assert client.get("/api/day", params={"date": "2026-01-15", "cutoff": cutoff}).status_code == 422
+
+
+def test_equivalent_cutoffs_share_one_cache_entry():
+    from app.main import decision_frame
+    decision_frame.cache_clear()
+    a = client.get("/api/accuracy", params={"cutoff": "09:00"}).json()
+    b = client.get("/api/accuracy", params={"cutoff": "09:00:00"}).json()
+    assert a == b and b["cutoff"] == "09:00"
+    assert decision_frame.cache_info().currsize == 1
 
 
 def test_accuracy_shape():

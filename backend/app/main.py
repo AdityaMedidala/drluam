@@ -36,11 +36,15 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], a
 
 
 # --------------------------------------------------------------------------- helpers
-def parse_cutoff(value: str) -> time:
+def normalise_cutoff(value: str) -> str:
+    """'09:00:00' -> '09:00'; anything not in CUTOFF_OPTIONS is a 422."""
     try:
-        return time.fromisoformat(value)
+        norm = time.fromisoformat(value).strftime("%H:%M")
     except ValueError:
-        raise HTTPException(400, f"cutoff must be HH:MM, got {value!r}")
+        norm = None
+    if norm not in CUTOFF_OPTIONS:
+        raise HTTPException(422, f"cutoff must be one of {CUTOFF_OPTIONS}, got {value!r}")
+    return norm
 
 
 def clean(obj):
@@ -60,9 +64,10 @@ def clean(obj):
     return obj
 
 
-@lru_cache(maxsize=16)
+@lru_cache(maxsize=len(CUTOFF_OPTIONS))
 def decision_frame(cutoff_str: str) -> pd.DataFrame:
-    return an.build_decision_frame(load_forecasts(), load_actuals(), parse_cutoff(cutoff_str))
+    """Cached per normalised cutoff -- callers pass normalise_cutoff() output."""
+    return an.build_decision_frame(load_forecasts(), load_actuals(), time.fromisoformat(cutoff_str))
 
 
 def scoped_frame(cutoff_str: str) -> pd.DataFrame:
@@ -99,6 +104,7 @@ def meta():
 def day(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF):
     if not FIRST_DELIVERY <= date_ <= LAST_DELIVERY:
         raise HTTPException(400, f"date must be between {FIRST_DELIVERY} and {LAST_DELIVERY}")
+    cutoff = normalise_cutoff(cutoff)
     frame = decision_frame(cutoff)
     hourly = frame[frame["deliveryDate"] == date_].set_index("startTime")
 
@@ -147,6 +153,7 @@ def day(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF):
 
 @app.get("/api/accuracy")
 def accuracy(cutoff: str = DEFAULT_CUTOFF):
+    cutoff = normalise_cutoff(cutoff)
     f = scoped_frame(cutoff).dropna(subset=["actual"])
     both = f.dropna(subset=["adjusted"])  # hours where a correction was possible (enough history)
 
