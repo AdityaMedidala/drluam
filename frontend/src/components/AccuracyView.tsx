@@ -5,7 +5,7 @@ import {
 import { api, type AccuracyResponse } from "../api";
 import { fmtAxisGW, fmtDate, fmtMW, fmtPct, fmtSignedMW, gwAxis } from "../format";
 import { useChartColors, type ChartColors } from "../theme";
-import { ChartCard, ErrorState, Insight, LegendItem, Loading, StatTile } from "./ui";
+import { ChartCard, ChartTooltip, ErrorState, Insight, LegendItem, Loading, StatTile } from "./ui";
 
 /** "How far can we trust the forecast?" across all January decisions. */
 export default function AccuracyView({ cutoff }: { cutoff: string }) {
@@ -88,16 +88,14 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                 <ReferenceLine segment={[{ x: 0.4, y: 0.4 }, { x: 1, y: 1 }]} stroke={c.axis} strokeDasharray="4 4" ifOverflow="hidden" />
                 <Tooltip content={({ active, payload }) =>
                   active && payload?.length ? (
-                    <div className="tooltip">
-                      <div className="tooltip-title">P{payload[0].payload.confidence} plan · target {fmtPct(payload[0].payload.target)}</div>
-                      <div className="tooltip-row"><span>Held in January</span><strong>{fmtPct(payload[0].payload.januaryHitRate)}</strong></div>
-                      {payload[0].payload.developmentHitRate != null && (
-                        <div className="tooltip-row"><span>Held Nov 2025 – Sep 2026</span><strong>{fmtPct(payload[0].payload.developmentHitRate)}</strong></div>
-                      )}
-                    </div>
+                    <ChartTooltip title={<>P{payload[0].payload.confidence} plan · target {fmtPct(payload[0].payload.target)}</>} rows={[
+                      { label: "Held in January", value: fmtPct(payload[0].payload.januaryHitRate), color: c.adjusted },
+                      ...(payload[0].payload.developmentHitRate != null
+                        ? [{ label: "Held Nov 2025 – Sep 2026", value: fmtPct(payload[0].payload.developmentHitRate), color: c.actual }] : []),
+                    ]} />
                   ) : null} />
-                <Line dataKey="januaryHitRate" stroke={c.adjusted} strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
-                {hasDev && <Line dataKey="developmentHitRate" stroke={c.actual} strokeWidth={2}
+                <Line dataKey="januaryHitRate" stroke={c.adjusted} strokeWidth={1.5} dot={{ r: 4 }} isAnimationActive={false} />
+                {hasDev && <Line dataKey="developmentHitRate" stroke={c.actual} strokeWidth={1.5}
                   dot={squareDot(c.actual)} isAnimationActive={false} />}
               </LineChart>
             </ResponsiveContainer>
@@ -129,15 +127,14 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                 <YAxis {...gwAxis(daily.flatMap((d) => [d.maeRaw, d.maeAdjusted]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
                 <Tooltip content={({ active, payload }) =>
                   active && payload?.length ? (
-                    <div className="tooltip">
-                      <div className="tooltip-title">{payload[0].payload.label}</div>
-                      <div className="tooltip-row"><span>Raw MAE</span><strong>{fmtMW(payload[0].payload.maeRaw)}</strong></div>
-                      <div className="tooltip-row"><span>Adjusted MAE</span><strong>{fmtMW(payload[0].payload.maeAdjusted)}</strong></div>
-                      <div className="tooltip-row"><span>Avg actual</span><strong>{fmtMW(payload[0].payload.actual)}</strong></div>
-                    </div>
+                    <ChartTooltip title={payload[0].payload.label} rows={[
+                      { label: "Raw MAE", value: fmtMW(payload[0].payload.maeRaw), color: c.forecast },
+                      { label: "Adjusted MAE", value: fmtMW(payload[0].payload.maeAdjusted), color: c.adjusted },
+                      { label: "Avg actual", value: fmtMW(payload[0].payload.actual) },
+                    ]} />
                   ) : null} />
-                <Line dataKey="maeRaw" stroke={c.forecast} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
-                <Line dataKey="maeAdjusted" stroke={c.adjusted} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+                <Line dataKey="maeRaw" stroke={c.forecast} strokeWidth={1.5} dot={{ r: 3 }} isAnimationActive={false} />
+                <Line dataKey="maeAdjusted" stroke={c.adjusted} strokeWidth={1.5} dot={{ r: 3 }} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -173,8 +170,8 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                 <XAxis dataKey="group" tickFormatter={(g) => (g.startsWith("<0h") ? "elapsed" : g)} stroke={c.axis} tickLine={false} fontSize={12} />
                 <YAxis {...gwAxis(data.byHorizon.flatMap((r) => [r.errorMae, r.errorBias]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
                 <Tooltip content={<GroupTooltip c={c} rawOnly />} />
-                <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
-                <Line dataKey="errorBias" stroke={c.forecast} strokeWidth={2} strokeDasharray="5 4" dot={{ r: 4 }} isAnimationActive={false} />
+                <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={1.5} dot={{ r: 4 }} isAnimationActive={false} />
+                <Line dataKey="errorBias" stroke={c.forecast} strokeWidth={1.5} strokeDasharray="5 4" dot={{ r: 4 }} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -192,10 +189,8 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                 <ReferenceLine x={0} stroke={c.axis} strokeDasharray="3 3" />
                 <Tooltip cursor={{ fill: c.grid }} content={({ active, payload }) =>
                   active && payload?.length ? (
-                    <div className="tooltip">
-                      <div className="tooltip-title">{fmtSignedMW(payload[0].payload.from)} to {fmtSignedMW(payload[0].payload.to)}</div>
-                      <div className="tooltip-row"><span>Hours</span><strong>{payload[0].payload.count}</strong></div>
-                    </div>
+                    <ChartTooltip title={<>{fmtSignedMW(payload[0].payload.from)} to {fmtSignedMW(payload[0].payload.to)}</>}
+                      rows={[{ label: "Hours", value: payload[0].payload.count, color: c.forecast }]} />
                   ) : null} />
                 <Bar dataKey="count" fill={c.forecast} radius={[4, 4, 0, 0]} isAnimationActive={false} />
               </BarChart>
@@ -214,8 +209,8 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                 <XAxis dataKey="group" tickFormatter={(h) => `${String(h).padStart(2, "0")}:00`} interval={3} stroke={c.axis} tickLine={false} fontSize={12} />
                 <YAxis {...gwAxis(data.byHour.flatMap((r) => [r.errorMae, r.adjErrorMae]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
                 <Tooltip content={<GroupTooltip c={c} metric="MAE" hour />} />
-                <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={2} dot={false} isAnimationActive={false} />
-                <Line dataKey="adjErrorMae" stroke={c.adjusted} strokeWidth={2} dot={false} isAnimationActive={false} />
+                <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                <Line dataKey="adjErrorMae" stroke={c.adjusted} strokeWidth={1.5} dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -242,32 +237,16 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function GroupTooltip({ active, payload, metric, rawOnly, hour }: any & { c: ChartColors }) {
+function GroupTooltip({ active, payload, metric, rawOnly, hour, c }: any & { c: ChartColors }) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   const title = hour ? `${String(p.group).padStart(2, "0")}:00 UK` : p.group;
-  return (
-    <div className="tooltip">
-      <div className="tooltip-title">{title}</div>
-      {rawOnly ? (
-        <>
-          <div className="tooltip-row"><span>Typical error</span><strong>{fmtMW(p.errorMae)}</strong></div>
-          <div className="tooltip-row"><span>Bias</span><strong>{fmtSignedMW(p.errorBias)}</strong></div>
-        </>
-      ) : metric === "Bias" ? (
-        <>
-          <div className="tooltip-row"><span>Raw bias</span><strong>{fmtSignedMW(p.errorBias)}</strong></div>
-          <div className="tooltip-row"><span>Adjusted bias</span><strong>{fmtSignedMW(p.adjErrorBias)}</strong></div>
-        </>
-      ) : (
-        <>
-          <div className="tooltip-row"><span>Raw MAE</span><strong>{fmtMW(p.errorMae)}</strong></div>
-          <div className="tooltip-row"><span>Adjusted MAE</span><strong>{fmtMW(p.adjErrorMae)}</strong></div>
-        </>
-      )}
-      <div className="tooltip-row muted"><span>Hours</span><span>{p.n}</span></div>
-    </div>
-  );
+  const rows = rawOnly
+    ? [{ label: "Typical error", value: fmtMW(p.errorMae), color: c.forecast }, { label: "Bias", value: fmtSignedMW(p.errorBias), color: c.forecast }]
+    : metric === "Bias"
+      ? [{ label: "Raw bias", value: fmtSignedMW(p.errorBias), color: c.forecast }, { label: "Adjusted bias", value: fmtSignedMW(p.adjErrorBias), color: c.adjusted }]
+      : [{ label: "Raw MAE", value: fmtMW(p.errorMae), color: c.forecast }, { label: "Adjusted MAE", value: fmtMW(p.adjErrorMae), color: c.adjusted }];
+  return <ChartTooltip title={title} rows={[...rows, { label: "Hours", value: p.n }]} />;
 }
 
 // Square markers keep the second calibration series distinct without relying on colour.

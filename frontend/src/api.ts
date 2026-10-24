@@ -111,6 +111,14 @@ export interface DriftRun {
 
 export interface DriftResponse { date: string; cutoff: string; commonHours: number; runs: DriftRun[] }
 
+export interface Provenance {
+  source: string;
+  datasets: string[];
+  fetchedAt: string;
+  files: { file: string; sha256: string; verified: boolean }[];
+  allVerified: boolean;
+}
+
 async function get<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const qs = new URLSearchParams(params).toString();
   const res = await fetch(`/api${path}${qs ? `?${qs}` : ""}`);
@@ -120,6 +128,7 @@ async function get<T>(path: string, params: Record<string, string> = {}): Promis
 
 export const api = {
   meta: () => get<Meta>("/meta"),
+  provenance: () => get<Provenance>("/provenance"),
   day: (date: string, cutoff: string) => get<DayResponse>("/day", { date, cutoff }),
   accuracy: (cutoff: string) => get<AccuracyResponse>("/accuracy", { cutoff }),
   drift: (date: string, cutoff: string) => get<DriftResponse>("/drift", { date, cutoff }),

@@ -1,6 +1,6 @@
 import type { DayResponse, PlanResponse } from "../api";
 import { fmtGWh, fmtPct } from "../format";
-import { ErrorState, Loading } from "./ui";
+import { ErrorState, Loading, withUnit } from "./ui";
 
 export const CONFIDENCES = [50, 70, 80, 90, 95];
 
@@ -50,17 +50,17 @@ export default function PlanPanel({ plan, day, error, confidence, onConfidence }
             <div className="ladder">
               <div className="rung">
                 <span className="muted">Raw forecast</span>
-                <strong>{fmtGWh(plan.day.rawForecastMWh)}</strong>
+                <strong>{withUnit(fmtGWh(plan.day.rawForecastMWh))}</strong>
               </div>
               <span className="ladder-arrow" aria-hidden>→</span>
               <div className="rung">
                 <span className="muted">Expected (adjusted)</span>
-                <strong>{fmtGWh(plan.day.adjustedMWh)}</strong>
+                <strong>{withUnit(fmtGWh(plan.day.adjustedMWh))}</strong>
               </div>
               <span className="ladder-arrow" aria-hidden>→</span>
               <div className="rung rung-plan">
                 <span className="muted">Plan on (P{confidence})</span>
-                <strong>{fmtGWh(plan.day.planMWh)}</strong>
+                <strong>{withUnit(fmtGWh(plan.day.planMWh))}</strong>
               </div>
             </div>
             <p className="ladder-gap">

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { api, type Meta } from "./api";
+import { api, type Meta, type Provenance } from "./api";
 import AccuracyView from "./components/AccuracyView";
 import DecisionView from "./components/DecisionView";
 import { ErrorState, Loading } from "./components/ui";
+import { setTheme, useTheme } from "./theme";
 import { readParam, writeParam } from "./url";
 
 // GB day-ahead auction gate closures (UK time).
@@ -15,6 +16,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("decision");
   const [cutoff, setCutoff] = useState("09:20");
+  const [prov, setProv] = useState<Provenance | null>(null);
+  const theme = useTheme();
 
   useEffect(() => {
     api.meta().then((m) => {
@@ -24,6 +27,7 @@ export default function App() {
     }).catch((e) => setError(String(e)));
   }, []);
   useEffect(() => { if (meta) writeParam("cutoff", cutoff); }, [meta, cutoff]);
+  useEffect(() => { api.provenance().then(setProv).catch(() => setProv(null)); }, []);
 
   return (
     <div className="app">
@@ -37,6 +41,7 @@ export default function App() {
             <p className="muted">GB national wind · day-ahead purchase decisions · January 2026 pilot</p>
           </div>
         </div>
+        <div className="topbar-controls">
         {meta && (
           <label className="cutoff">
             <span className="muted">Decision cutoff (UK, day before)</span>
@@ -45,6 +50,11 @@ export default function App() {
             </select>
           </label>
         )}
+        <button type="button" className="theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>
+          {theme === "dark" ? "☀ Light" : "☾ Dark"}
+        </button>
+        </div>
       </header>
 
       <nav className="tabs" role="tablist">
@@ -58,8 +68,13 @@ export default function App() {
         {meta && (tab === "decision" ? <DecisionView meta={meta} cutoff={cutoff} /> : <AccuracyView cutoff={cutoff} />)}
       </main>
 
-      <footer className="footer muted">
-        Data: Elexon BMRS — WINDFOR (forecasts) and FUELHH (actual wind generation). Times in UK local time.
+      <footer className="provenance" aria-label="Data provenance">
+        <span>Source: Elexon BMRS (WINDFOR, FUELHH)</span>
+        {prov && <span>· snapshot fetched {new Date(prov.fetchedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>}
+        {prov && (prov.allVerified
+          ? <span className="ok">· checksums verified ✓</span>
+          : <span className="bad">· checksum mismatch ✗ ({prov.files.filter((f) => !f.verified).map((f) => f.file).join(", ")})</span>)}
+        <span>· times in UK local time</span>
       </footer>
     </div>
   );

@@ -5,6 +5,7 @@ GET /api/day?date=YYYY-MM-DD&cutoff=  decision forecast vs actual for one delive
 GET /api/accuracy?cutoff=             accuracy of decision forecasts across January
 GET /api/plan?date=&cutoff=&confidence=  wind to plan on at C% confidence, plus its January hit rate
 GET /api/drift?date=&cutoff=          every forecast run for that day up to the cutoff (forecast drift)
+GET /api/provenance                   data source, snapshot fetch time, checksum verification
 """
 from __future__ import annotations
 
@@ -20,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from . import analysis as an
-from .data import FIRST_DELIVERY, LAST_DELIVERY, load_actuals, load_forecasts
+from .data import FIRST_DELIVERY, LAST_DELIVERY, load_actuals, load_forecasts, provenance
 
 DEFAULT_CUTOFF = "09:20"  # EPEX day-ahead gate closure
 CUTOFF_OPTIONS = ["06:00", "08:00", "09:00", "09:20", "09:30", "09:50", "10:00", "11:00"]
@@ -105,6 +106,16 @@ def health():
     if not actual_rows or not forecast_rows:
         return JSONResponse({"status": "error", "detail": "data snapshot is empty"}, status_code=503)
     return {"status": "ok", "actualRows": actual_rows, "forecastRows": forecast_rows}
+
+
+@lru_cache(maxsize=1)
+def cached_provenance() -> dict:
+    return provenance()   # hashing ~2 MB once per process is enough; the snapshot doesn't change at runtime
+
+
+@app.get("/api/provenance")
+def provenance_route():
+    return cached_provenance()
 
 
 @app.get("/api/meta")

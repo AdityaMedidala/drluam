@@ -6,6 +6,8 @@ the upstream API is slow or down. Re-run the fetch script to refresh.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from datetime import date
 from functools import lru_cache
@@ -33,3 +35,20 @@ def load_forecasts() -> pd.DataFrame:
     for col in ("publishTime", "startTime"):
         df[col] = pd.to_datetime(df[col], utc=True)
     return df.sort_values(["publishTime", "startTime"]).reset_index(drop=True)
+
+
+def provenance(data_dir: Path = DATA_DIR) -> dict:
+    """Where the snapshot came from, and whether each CSV still matches the sha256 in its manifest."""
+    manifest = json.loads((data_dir / "manifest.json").read_text())
+    files = []
+    for key in ("forecasts", "actuals"):
+        entry = manifest[key]
+        actual = hashlib.sha256((data_dir / entry["file"]).read_bytes()).hexdigest()
+        files.append({"file": entry["file"], "sha256": entry["sha256"], "verified": actual == entry["sha256"]})
+    return {
+        "source": manifest["source"],
+        "datasets": [manifest["forecasts"]["dataset"], manifest["actuals"]["dataset"]],
+        "fetchedAt": manifest["fetchedAt"],
+        "files": files,
+        "allVerified": all(f["verified"] for f in files),
+    }

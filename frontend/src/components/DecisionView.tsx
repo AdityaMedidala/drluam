@@ -8,7 +8,7 @@ import { useChartColors } from "../theme";
 import { readParam, writeParam } from "../url";
 import DriftPanel from "./DriftPanel";
 import PlanPanel, { CONFIDENCES } from "./PlanPanel";
-import { ChartCard, ErrorState, LegendItem, Loading, StatTile } from "./ui";
+import { ChartCard, ChartTooltip, ErrorState, LegendItem, Loading, ModuleLabel, StatTile } from "./ui";
 
 function initialDate(meta: Meta) {
   const d = readParam("date");
@@ -103,12 +103,17 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
         </p>
       )}
 
-      <PlanPanel plan={plan} day={data} error={planError} confidence={confidence} onConfidence={setConfidence} />
+      <section className="module">
+        <ModuleLabel n="01">Plan</ModuleLabel>
+        <PlanPanel plan={plan} day={data} error={planError} confidence={confidence} onConfidence={setConfidence} />
+      </section>
 
       {error && <ErrorState error={error} />}
       {!data && !error && <Loading />}
       {data && !error && (
         <>
+          <section className="module">
+          <ModuleLabel n="02">Forecast</ModuleLabel>
           {showActual && (
             <div className="tiles">
               <StatTile label="What actually happened"
@@ -118,7 +123,7 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
           )}
 
           <ChartCard wide
-            title="National wind generation forecast"
+            title="What the desk knew at the cutoff"
             subtitle={<>Forecast available at decision time, hourly · band = adjusted forecast + P10–P90 of the last 7 days' misses (actual − adjusted forecast) · in January the actual landed inside it in <strong>{coverage}</strong> of hours (not 80%)</>}
             legend={<>
               <LegendItem color={c.forecast} label="Raw forecast" />
@@ -132,11 +137,11 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
                   <CartesianGrid stroke={c.grid} vertical={false} />
                   <XAxis dataKey="time" tickFormatter={fmtTime} ticks={sixHourTicks} stroke={c.axis} tickLine={false} fontSize={12} />
                   <YAxis {...gwAxis(chartData.flatMap((p) => [p.forecast, p.high, showActual ? p.actual : null]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
-                  <Tooltip content={<DayTooltip showActual={showActual} />} />
+                  <Tooltip content={<DayTooltip showActual={showActual} c={c} />} />
                   {hasCorrection && <Area dataKey="band" stroke="none" fill={c.band} fillOpacity={0.14} connectNulls isAnimationActive={false} />}
-                  <Line dataKey="forecast" stroke={c.forecast} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
-                  {hasCorrection && <Line dataKey="adjusted" stroke={c.adjusted} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />}
-                  {showActual && <Line dataKey="actual" stroke={c.actual} strokeWidth={2} dot={false} isAnimationActive={false} />}
+                  <Line dataKey="forecast" stroke={c.forecast} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
+                  {hasCorrection && <Line dataKey="adjusted" stroke={c.adjusted} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />}
+                  {showActual && <Line dataKey="actual" stroke={c.actual} strokeWidth={1.5} dot={false} isAnimationActive={false} />}
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -155,8 +160,12 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
               </table>
             </details>
           </ChartCard>
+          </section>
 
-          <DriftPanel drift={drift} error={driftError} c={c} />
+          <section className="module">
+            <ModuleLabel n="03">Forecast drift</ModuleLabel>
+            <DriftPanel drift={drift} error={driftError} c={c} />
+          </section>
         </>
       )}
     </div>
@@ -164,20 +173,14 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function DayTooltip({ active, payload, showActual }: any) {
+function DayTooltip({ active, payload, showActual, c }: any) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
-  return (
-    <div className="tooltip">
-      <div className="tooltip-title">{fmtTime(p.time)} UK</div>
-      {p.forecast != null && <Row label="Raw forecast" value={fmtMW(p.forecast)} />}
-      {p.adjusted != null && <Row label="Adjusted" value={fmtMW(p.adjusted)} />}
-      {p.low != null && <Row label="P10–P90" value={`${fmtMW(p.low)} – ${fmtMW(p.high)}`} />}
-      {showActual && p.actual != null && <Row label="Actual" value={fmtMW(p.actual)} />}
-    </div>
-  );
+  const rows = [
+    p.forecast != null && { label: "Raw forecast", value: fmtMW(p.forecast), color: c.forecast },
+    p.adjusted != null && { label: "Adjusted", value: fmtMW(p.adjusted), color: c.adjusted },
+    p.low != null && { label: "P10–P90", value: `${fmtMW(p.low)} – ${fmtMW(p.high)}`, color: c.band },
+    showActual && p.actual != null && { label: "Actual", value: fmtMW(p.actual), color: c.actual },
+  ].filter(Boolean);
+  return <ChartTooltip title={`${fmtTime(p.time)} UK`} rows={rows} />;
 }
-
-const Row = ({ label, value }: { label: string; value: string }) => (
-  <div className="tooltip-row"><span>{label}</span><strong>{value}</strong></div>
-);

@@ -6,6 +6,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Wind Forecast Desk</title>
+    <script>
+      // Apply the saved theme before first paint (light by default); storage can be blocked.
+      try { document.documentElement.dataset.theme = localStorage.getItem("wfd-theme") === "dark" ? "dark" : "light"; }
+      catch (e) { document.documentElement.dataset.theme = "light"; }
+    </script>
   </head>
   <body>
     <div id="root"></div>

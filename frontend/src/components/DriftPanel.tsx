@@ -3,7 +3,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import type { DriftResponse } from "../api";
 import { fmtDateTime, fmtGWh, fmtMW, fmtTime, gwAxis } from "../format";
 import type { ChartColors } from "../theme";
-import { ChartCard, ErrorState, LegendItem, Loading } from "./ui";
+import { ChartCard, ChartTooltip, ErrorState, LegendItem, Loading } from "./ui";
 
 /** How the forecast for one delivery day moved across the runs published up to the cutoff. */
 export default function DriftPanel({ drift, error, c }: { drift: DriftResponse | null; error: string | null; c: ChartColors }) {
@@ -32,7 +32,7 @@ export default function DriftPanel({ drift, error, c }: { drift: DriftResponse |
 
   return (
     <ChartCard wide
-      title="Forecast drift"
+      title="How the forecast for this day moved before the decision"
       subtitle={<>Every WINDFOR run published up to the cutoff, for this day's hours · on the {drift.commonHours} hours all {runs.length} runs cover,
         the forecast went from <strong>{fmtGWh(first.commonMWh)}</strong> (first run, {fmtDateTime(first.publishedUtc)}) to <strong>{fmtGWh(decision.commonMWh)}</strong> (decision run),
         {" "}{change >= 0 ? "+" : "−"}{fmtGWh(Math.abs(change))}</>}
@@ -48,11 +48,10 @@ export default function DriftPanel({ drift, error, c }: { drift: DriftResponse |
             <YAxis {...gwAxis(runs.flatMap((r) => r.hours.map((h) => h.forecastMW)))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
             <Tooltip content={({ active, payload }) =>
               active && payload?.length ? (
-                <div className="tooltip">
-                  <div className="tooltip-title">{fmtTime(String(payload[0].payload.time))} UK</div>
-                  <div className="tooltip-row"><span>First run</span><strong>{fmtMW(payload[0].payload.r0 as number | undefined)}</strong></div>
-                  <div className="tooltip-row"><span>Decision run</span><strong>{fmtMW(payload[0].payload[`r${runs.length - 1}`] as number | undefined)}</strong></div>
-                </div>
+                <ChartTooltip title={`${fmtTime(String(payload[0].payload.time))} UK`} rows={[
+                  { label: "First run", value: fmtMW(payload[0].payload.r0 as number | undefined), color: c.axis },
+                  { label: "Decision run", value: fmtMW(payload[0].payload[`r${runs.length - 1}`] as number | undefined), color: c.forecast },
+                ]} />
               ) : null} />
             {runs.map((r, i) => (
               <Line key={r.publishedUtc} dataKey={`r${i}`} dot={false} isAnimationActive={false} connectNulls
