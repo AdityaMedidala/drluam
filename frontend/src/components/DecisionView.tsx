@@ -61,6 +61,8 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
 
   const hasCorrection = data?.correctionRatio != null;
   const ratio = data?.correctionRatio ?? null;
+  // same source switch as PlanPanel: pooled Nov–Sep backtest where measured, otherwise January at this cutoff
+  const pooled = plan?.calibration.find((r) => r.confidence === confidence)?.developmentHitRate != null;
   const showLow = confidence !== 90;   // at P90 the planning volume is the range's low edge: one column, not two
   const legend = [
     { label: "NESO forecast", color: c.forecast },
@@ -130,7 +132,9 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
             <dt>Δ vs NESO forecast</dt>
             <dd>Planning volume minus NESO forecast. Negative means plan for less wind.</dd>
             <dt>Hit rate</dt>
-            <dd>Share of hours with outturn at or above the planning volume. Backtest from Nov 2025 to Sep 2026, 7,775 hours. Past performance, not a guarantee.</dd>
+            <dd>Share of hours with outturn at or above the planning volume. {pooled
+              ? "Backtest from Nov 2025 to Sep 2026, 7,775 hours."
+              : `January 2026 hours at ${cutoff}. The longer backtest covers the 09:00 and 09:20 decision times only.`} Past performance, not a guarantee.</dd>
             <dt>Under-coverage</dt>
             <dd>P90 missed 16% of hours (target 10%). P95 missed 11% (target 5%). Whole-day shortfalls happen more often than the previous week suggests.</dd>
             <dt>80% range</dt>

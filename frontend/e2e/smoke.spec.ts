@@ -84,3 +84,21 @@ test("with no URL parameters the app opens on the representative day, 17 Jan", a
   await expect(page.locator("#delivery-day")).toHaveValue("17/01/2026");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Day-ahead plan · Sat 17 Jan 2026");
 });
+
+test("the Methodology hit-rate line follows the decision time, like the plan panel", async ({ page }) => {
+  const hitRate = () => page.locator(".methodology dt", { hasText: /^Hit rate$/ }).locator("xpath=following-sibling::dd[1]");
+  await page.goto("/?date=2026-01-17&cutoff=09:20");
+  await page.getByRole("button", { name: "Methodology" }).click();
+  await expect(hitRate()).toContainText("Backtest from Nov 2025 to Sep 2026");
+  await page.goto("/?date=2026-01-17&cutoff=08:00");
+  await page.getByRole("button", { name: "Methodology" }).click();
+  await expect(hitRate()).toContainText("January 2026 hours at 08:00");
+});
+
+test("a mouse click on a header tab leaves no focus ring", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Accuracy" }).click();
+  const tab = page.getByRole("link", { name: "Accuracy" });
+  await expect(tab).toBeFocused();
+  expect(await tab.evaluate((e) => getComputedStyle(e).borderColor)).toBe("rgba(0, 0, 0, 0)");
+});
