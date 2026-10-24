@@ -1,10 +1,33 @@
 // IBM Carbon (g10 light default, g100 dark via <Theme>), IBM Plex from the per-family packages.
-@use '@carbon/react/scss/config' with (
+// Only the foundations and the components this app uses are compiled.
+@use '@carbon/styles/scss/config' with (
   $font-path: '@ibm/plex',
   $use-per-family-plex: true,
 );
-@use '@carbon/react';
-@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/styles/scss/reset';
+@use '@carbon/styles/scss/fonts';
+@use '@carbon/styles/scss/theme';
+@use '@carbon/styles/scss/zone';     // .cds--g10 / .cds--g100 classes used by <Theme>
+@use '@carbon/styles/scss/layer';
+@use '@carbon/styles/scss/layout';    // size/density custom properties components read
+@use '@carbon/styles/scss/components/ui-shell';
+@use '@carbon/styles/scss/components/button';
+@use '@carbon/styles/scss/components/form';
+@use '@carbon/styles/scss/components/text-input';
+@use '@carbon/styles/scss/components/date-picker';
+@use '@carbon/styles/scss/components/list-box';
+@use '@carbon/styles/scss/components/dropdown';
+@use '@carbon/styles/scss/components/content-switcher';
+@use '@carbon/styles/scss/components/toggle';
+@use '@carbon/styles/scss/components/tile';
+@use '@carbon/styles/scss/components/structured-list';
+@use '@carbon/styles/scss/components/accordion';
+@use '@carbon/styles/scss/components/data-table';
+@use '@carbon/styles/scss/components/popover';
+@use '@carbon/styles/scss/components/tooltip';
+@use '@carbon/styles/scss/components/notification';
+@use '@carbon/styles/scss/components/skeleton-styles';
+@use '@carbon/styles/scss/spacing' as *;
 
 // ---------------------------------------------------------------- page
 html, body { margin: 0; }
@@ -24,12 +47,16 @@ $chrome: 48px + $bar;
 .control-bar .date-group { display: flex; align-items: flex-end; gap: 2px; }
 .control-bar .cds--content-switcher { width: auto; }
 .control-bar .spacer { flex: 1; }
+.page-title { margin-right: auto; align-self: center; }
+.page-title h1 { margin: 0; font-size: 1.25rem; font-weight: 400; line-height: 1.4; white-space: nowrap; }
+.page-title p { margin: 0; font-size: 0.75rem; color: var(--cds-text-secondary); }
 
 .page { max-width: 1600px; margin: 0 auto; padding: $spacing-05 $spacing-07; }
 
 // ---------------------------------------------------------------- tiles and text
 .tile { display: flex; flex-direction: column; min-width: 0; padding: $spacing-05; border: 1px solid var(--cds-border-subtle-01); }
-.tile h2, .tile h3 { margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.375; }
+// one chart-title size everywhere, including inside accordions
+.chart-title { margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.375; letter-spacing: 0; }
 .sub { margin: 2px 0 $spacing-03; font-size: 0.875rem; color: var(--cds-text-secondary); }
 .source { margin-top: $spacing-02; font-size: 0.75rem; color: var(--cds-text-helper); }
 .label { font-size: 0.875rem; color: var(--cds-text-secondary); }
@@ -40,21 +67,20 @@ $chrome: 48px + $bar;
 .warn { font-size: 0.75rem; color: var(--cds-text-error); }
 .decision-list { margin-bottom: 0; }
 .decision-list .cds--structured-list-td:last-child { text-align: right; white-space: nowrap; }
-.drift { margin-top: $spacing-05; padding-top: $spacing-05; border-top: 1px solid var(--cds-border-subtle-01); }
-.drift h3 { font-size: 0.875rem; }
+.drift { display: flex; flex-direction: column; flex: 1; min-height: 0; margin-top: $spacing-05; padding-top: $spacing-05; border-top: 1px solid var(--cds-border-subtle-01); }
+.drift .drift-plot { flex: 1; min-height: 150px; }
 .figures { display: flex; flex-wrap: wrap; gap: $spacing-05 $spacing-09; margin: $spacing-06 0; }
 .figures div { display: flex; align-items: baseline; gap: $spacing-03; }
 .figures b { font-size: 2rem; font-weight: 400; font-variant-numeric: tabular-nums; }
 .figures span { color: var(--cds-text-secondary); font-size: 0.875rem; }
 
 // ---------------------------------------------------------------- Decision: fit to the viewport
-.decision { display: grid; grid-template-columns: minmax(300px, 340px) 1fr; gap: $spacing-05; }
+.decision { display: grid; grid-template-columns: minmax(300px, 384px) 1fr; gap: $spacing-05; }
 @media (min-width: 1056px) {
   .decision > .tile { height: calc(100vh - #{$chrome} - 2 * #{$spacing-05}); }
   .decision .main-plot { flex: 1; min-height: 0; }
 }
 .main-plot { height: 320px; }
-.drift-plot { height: 150px; }
 .decision-left { overflow: hidden; }
 
 // ---------------------------------------------------------------- Accuracy
@@ -76,7 +102,10 @@ $chrome: 48px + $bar;
 .chart-tooltip .t-row { display: flex; justify-content: space-between; gap: $spacing-05; font-variant-numeric: tabular-nums; }
 .chart-tooltip .swatch { display: inline-block; width: 8px; height: 8px; margin-right: $spacing-02; }
 
-.methodology ul { margin: 0; padding-left: $spacing-05; list-style: disc; display: grid; gap: $spacing-03; max-width: 75ch; color: var(--cds-text-secondary); }
+// Methodology: term | explanation
+.methodology { display: grid; grid-template-columns: minmax(10rem, max-content) minmax(0, 70ch); column-gap: $spacing-07; row-gap: $spacing-05; margin: 0; line-height: 1.5; font-size: 0.875rem; }
+.methodology dt { font-weight: 600; color: var(--cds-text-primary); }
+.methodology dd { margin: 0; color: var(--cds-text-secondary); }
 .provenance { margin-top: $spacing-07; padding-top: $spacing-04; border-top: 1px solid var(--cds-border-subtle-01); font-size: 0.75rem; color: var(--cds-text-helper); }
 .provenance .bad { color: var(--cds-text-error); }
 
@@ -85,10 +114,15 @@ $chrome: 48px + $bar;
   .decision { grid-template-columns: 1fr; }
   .three { grid-template-columns: 1fr; }
 }
-@media (max-width: 1055px) { .control-bar { height: auto; } }
+@media (max-width: 1055px) { .control-bar { height: auto; } .page-title { width: 100%; } }
+@media (max-width: 671px) { .methodology { grid-template-columns: 1fr; row-gap: $spacing-02; } .methodology dd { margin-bottom: $spacing-04; } }
 @media (max-width: 671px) {
   .control-bar, .page { padding-left: $spacing-05; padding-right: $spacing-05; }
   .hero { font-size: 2.25rem; }
   .main-plot { height: 280px; }
   .run { white-space: normal; }
 }
+.control-bar > * { flex-shrink: 0; }
+.control-bar .page-title { flex-shrink: 1; min-width: 0; }
+.control-bar .cds--date-picker.cds--date-picker--single .cds--date-picker__input { width: 9.5rem; }
+.control-bar .cds--content-switcher-btn { min-width: 3.25rem; }
