@@ -143,11 +143,14 @@ def error_metrics(error: pd.Series, actual: pd.Series) -> dict:
 
 
 def grouped_metrics(df: pd.DataFrame, by: pd.Series, error_cols=("error", "adjError")) -> list[dict]:
+    """Bias and MAE per group, computed for every error column on the SAME hours
+    (rows missing any of them are dropped), so raw vs adjusted is like for like."""
+    df = df.dropna(subset=list(error_cols))
     rows = []
-    for key, g in df.groupby(by, observed=True, sort=True):
+    for key, g in df.groupby(by.loc[df.index], observed=True, sort=True):
         row = {"group": str(key), "n": int(len(g))}
         for col in error_cols:
-            e = g[col].dropna()
+            e = g[col]
             row[f"{col}Bias"] = float(e.mean()) if len(e) else None
             row[f"{col}Mae"] = float(e.abs().mean()) if len(e) else None
         rows.append(row)

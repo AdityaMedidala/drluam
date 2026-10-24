@@ -160,3 +160,12 @@ def test_horizon_metrics_has_bucket_for_already_elapsed_hours():
     assert rows[0]["group"] == "<0h (already elapsed)"
     assert by["<0h (already elapsed)"]["errorBias"] == 50.0
     assert by["0-6h"]["errorBias"] == 200.0
+
+
+def test_grouped_metrics_compares_raw_and_adjusted_on_the_same_hours():
+    from app.analysis import grouped_metrics
+    df = pd.DataFrame({"g": ["a"] * 3, "error": [100.0, 100.0, 1000.0], "adjError": [50.0, 50.0, np.nan]})
+    row = grouped_metrics(df, df["g"])[0]
+    # The third hour has no adjusted forecast, so it must not count for raw either.
+    assert row["n"] == 2
+    assert row["errorBias"] == 100.0 and row["adjErrorBias"] == 50.0

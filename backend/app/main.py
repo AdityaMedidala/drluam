@@ -138,7 +138,7 @@ def accuracy(cutoff: str = DEFAULT_CUTOFF):
     level = pd.cut(f["forecast"], [0, 5000, 10000, 15000, 30000],
                    labels=["<5 GW", "5-10 GW", "10-15 GW", ">15 GW"])
     daily = (
-        f.groupby("deliveryDate")
+        both.groupby("deliveryDate")  # same hours for raw and adjusted
         .agg(actual=("actual", "mean"), forecast=("forecast", "mean"), adjusted=("adjusted", "mean"),
              maeRaw=("error", lambda e: e.abs().mean()), maeAdjusted=("adjError", lambda e: e.abs().mean()))
         .reset_index()
