@@ -31,6 +31,12 @@ CUTOFF_OPTIONS = ["06:00", "08:00", "09:00", "09:20", "09:30", "09:50", "10:00",
 # the same as at 09:20 (no WINDFOR run is published between 09:00 and 09:20 UK).
 DEV_PLAN_HIT_RATES = {50: 0.495, 70: 0.6691, 80: 0.7561, 90: 0.8397, 95: 0.8938}
 DEV_PLAN_CUTOFFS = {"09:00", "09:20"}
+# (MWh short, MWh long) at each level over the same 7,775 hours, from analysis.plan_volumes
+# (tests/test_plan.py recomputes them). Enough to find the 11-month lowest-cost level for any costs.
+DEV_PLAN_VOLUMES = {50: (5032997, 4857127), 70: (2843679, 8220627), 80: (2019674, 10749809),
+                    90: (1208053, 14708471), 95: (747046, 17940248)}
+DEV_HOURS = 7775
+DEV_PERIOD = {"firstDecision": date(2025, 11, 1), "lastDecision": date(2026, 9, 30)}
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -231,6 +237,9 @@ def cost(cutoff: str = DEFAULT_CUTOFF,
         "short": short,
         "long": long,
         "recommended": an.recommended_level(short, long),
+        # Nov 2025 - Sep 2026 lowest-cost level; measured only where the run selection matches 09:20.
+        "development": {"bestLevel": an.best_level(DEV_PLAN_VOLUMES, short, long), "hours": DEV_HOURS, "period": DEV_PERIOD}
+                       if cutoff in DEV_PLAN_CUTOFFS else None,
         "backtest": {"period": {"firstDelivery": FIRST_DELIVERY, "lastDelivery": LAST_DELIVERY},
                      **an.cost_backtest(scoped_frame(cutoff), short, long)},
     })

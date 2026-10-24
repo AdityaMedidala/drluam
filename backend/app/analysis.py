@@ -283,6 +283,26 @@ def cost_backtest(frame: pd.DataFrame, short: float, long: float) -> dict:
     }
 
 
+def plan_volumes(frame: pd.DataFrame) -> dict:
+    """MWh short and MWh long at each level, on the cost backtest's hours.
+
+    Cost at level C is short x MWh short + long x MWh long, so these ten totals are
+    enough to find a period's lowest-cost level for any pair of costs.
+    """
+    cols = ["actual", *(f"plan{c}" for c in PLAN_CONFIDENCES), *(c for c in ("forecast", "adjusted") if c in frame)]
+    f = frame.dropna(subset=cols)
+    return {
+        "hours": int(len(f)),
+        "levels": {c: (float((f[f"plan{c}"] - f["actual"]).clip(lower=0).sum()),
+                       float((f["actual"] - f[f"plan{c}"]).clip(lower=0).sum())) for c in PLAN_CONFIDENCES},
+    }
+
+
+def best_level(volumes: dict, short: float, long: float) -> int:
+    """Lowest-cost level from (MWh short, MWh long) per level."""
+    return min(volumes, key=lambda c: short * volumes[c][0] + long * volumes[c][1])
+
+
 def error_histogram(error: pd.Series, width: int = 500) -> list[dict]:
     """Bins of `width` MW centred on multiples of `width`, so one bin is centred exactly on zero."""
     e = error.dropna()

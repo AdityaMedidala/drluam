@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-from app.analysis import PLAN_CONFIDENCES, cost_backtest, plan_cost, recommended_level
+from app.analysis import PLAN_CONFIDENCES, best_level, cost_backtest, plan_cost, plan_volumes, recommended_level
 from app.main import app
 
 client = TestClient(app)
@@ -111,3 +111,31 @@ def test_cost_route_matches_a_recompute_from_the_decision_frame():
 @pytest.mark.parametrize("params", [{"short": 0}, {"long": -5}, {"short": "abc"}])
 def test_cost_route_rejects_bad_costs(params):
     assert client.get("/api/cost", params=params).status_code == 422
+
+
+def test_plan_volumes_by_hand():
+    frame = pd.DataFrame({"actual": [80.0, 70.0], **{f"plan{c}": [100.0, 50.0] for c in PLAN_CONFIDENCES}})
+    v = plan_volumes(frame)
+    assert v["hours"] == 2
+    assert v["levels"][80] == (20.0, 20.0)      # (MWh short, MWh long)
+
+
+def test_best_level_from_volumes_matches_the_cost_backtest():
+    rng = np.random.default_rng(1)
+    adjusted = rng.uniform(1000, 15000, 500)
+    frame = pd.DataFrame({"actual": adjusted + rng.normal(0, 2000, 500), "forecast": adjusted * 1.1, "adjusted": adjusted,
+                          **{f"plan{c}": adjusted - 25 * (c - 50) for c in PLAN_CONFIDENCES}})
+    volumes = plan_volumes(frame)["levels"]
+    for short, long in [(100, 30), (50, 50), (30, 100), (400, 20)]:
+        assert best_level(volumes, short, long) == cost_backtest(frame, short, long)["bestLevel"]
+
+
+def test_cost_route_reports_the_11_month_backtest_best_level():
+    body = client.get("/api/cost").json()
+    assert body["development"] == {"bestLevel": 80, "hours": 7775,
+                                   "period": {"firstDecision": "2025-11-01", "lastDecision": "2026-09-30"}}
+    assert client.get("/api/cost", params={"short": 200, "long": 20}).json()["development"]["bestLevel"] == 95
+
+
+def test_cost_route_has_no_11_month_best_level_where_it_was_not_measured():
+    assert client.get("/api/cost", params={"cutoff": "08:00"}).json()["development"] is None

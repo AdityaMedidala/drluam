@@ -109,9 +109,27 @@ DEV_DIRS = [ANALYSIS / "data", ANALYSIS / "data-2026-04-09"]
 @pytest.mark.skipif(not all((d / "forecasts_wind.csv").exists() for d in DEV_DIRS),
                     reason="analysis CSVs not present (rebuild with fetch_data.py, see README)")
 def test_dev_hit_rate_constants_match_a_recompute():
-    # Same data and rules as analysis/plan_backtest.py: nothing before 1 Nov 2025,
-    # decision month = D-1 in Nov 2025 - Sep 2026, only hours with 168 residuals.
     from app.main import DEV_PLAN_HIT_RATES
+    scored = dev_scored_frame()
+    assert plan_hit_rate(scored, 50)["n"] == 7775
+    for c in PLAN_CONFIDENCES:
+        assert plan_hit_rate(scored, c)["hitRate"] == pytest.approx(DEV_PLAN_HIT_RATES[c], abs=5e-5)
+
+
+@pytest.mark.skipif(not all((d / "forecasts_wind.csv").exists() for d in DEV_DIRS),
+                    reason="analysis CSVs not present (rebuild with fetch_data.py, see README)")
+def test_dev_cost_volume_constants_match_a_recompute():
+    from app.analysis import plan_volumes
+    from app.main import DEV_PLAN_VOLUMES
+    volumes = plan_volumes(dev_scored_frame())
+    assert volumes["hours"] == 7775
+    for c in PLAN_CONFIDENCES:
+        assert volumes["levels"][c] == pytest.approx(DEV_PLAN_VOLUMES[c], abs=1)
+
+
+def dev_scored_frame() -> pd.DataFrame:
+    """Same data and rules as analysis/plan_backtest.py: nothing before 1 Nov 2025,
+    decision month = D-1 in Nov 2025 - Sep 2026, only hours with 168 residuals."""
     start = pd.Timestamp("2025-11-01", tz="UTC")
     acts, fcs = [], []
     for d in DEV_DIRS:
@@ -126,7 +144,4 @@ def test_dev_hit_rate_constants_match_a_recompute():
 
     frame = build_decision_frame(forecasts, actuals, time(9, 20))
     month = (pd.to_datetime(frame["deliveryDate"]) - pd.Timedelta(days=1)).dt.strftime("%Y-%m")
-    scored = frame[(frame["bandPoints"] == 168) & (month >= "2025-11") & (month <= "2026-09")]
-    assert plan_hit_rate(scored, 50)["n"] == 7775
-    for c in PLAN_CONFIDENCES:
-        assert plan_hit_rate(scored, c)["hitRate"] == pytest.approx(DEV_PLAN_HIT_RATES[c], abs=5e-5)
+    return frame[(frame["bandPoints"] == 168) & (month >= "2025-11") & (month <= "2026-09")]
