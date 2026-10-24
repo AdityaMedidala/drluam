@@ -18,14 +18,15 @@ Clock time I spent on the challenge, in IST (UTC+05:30). AI assistants (Claude i
 | 13:05–13:30 | 0.3 | Core | Master plan for the remaining work (PLAN.md), time log, git author fix. Prior-art fixes (09:20/09:50 cutoffs, 09:20 default, data checksums, analysis CSVs out of git). "Plan on" API and its backtest. |
 | 13:30–13:50 | 0.3 | Core | "Plan on" panel, calibration chart, copy check, design pass on the Decision view. |
 | 13:50–14:14 | 0.4 | Extra | Method decisions (14-day band pre-registered, affine dropped), skill scores with day-block bootstrap, curtailment check with Elexon BOAV. |
+| 14:14–14:25 | 0.2 | Extra | Independent review of the new claims, five wording fixes, NESO constraint-volume cross-check. |
 
-**Total so far:** about 2.95 h, of which about 1.8 h core and 1.15 h extra.
+**Total so far:** about 3.15 h, of which about 1.8 h core and 1.35 h extra.
 
 ## Running totals
 
 | | Core build | Extra analysis | Total |
 |---|---|---|---|
-| Sat 24 Oct | ~1.8 h | ~1.15 h | ~2.95 h |
-| **Cumulative** | **~1.8 h** | **~1.15 h** | **~2.95 h** |
+| Sat 24 Oct | ~1.8 h | ~1.35 h | ~3.15 h |
+| **Cumulative** | **~1.8 h** | **~1.35 h** | **~3.15 h** |
 
 _Add a row per session. Video scripting, rehearsal and recording count as core: the brief requires the video._
