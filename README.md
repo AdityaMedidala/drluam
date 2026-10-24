@@ -33,7 +33,7 @@ A web app for a UK utility's day-ahead power buying team. It answers two questio
 flowchart LR
   E[Elexon BMRS API<br/>WINDFOR + FUELHH] -->|scripts/fetch_data.py| D[(backend/data/*.csv<br/>January snapshot)]
   D --> A[analysis.py<br/>pick decision forecast<br/>correction + metrics]
-  A --> API[FastAPI<br/>/api/meta /api/day /api/accuracy]
+  A --> API[FastAPI<br/>/api/meta /api/day /api/accuracy /api/plan]
   API --> UI[React + Recharts<br/>Decision view / Accuracy view]
 ```
 
@@ -151,6 +151,7 @@ Outside the app; each analysis runs the app's own logic unchanged on other month
 
 - [docs/validation.md](docs/validation.md): on Nov 2025 – Mar 2026 the correction removes 82–102% of the bias and cuts MAE by 10–54% in every month. The band under-covers everywhere (64–73% vs 80%).
 - [docs/error-anatomy.md](docs/error-anatomy.md): across Nov 2025 – Sep 2026 the error is mostly whole-day level, not timing (a per-day level fix would remove 55% of MAE, a time shift 17%). The forecast catches only half of >2 GW ramps.
+- [docs/plan-backtest.md](docs/plan-backtest.md): the "plan on C%" number is about right at P50 but over-promises in the tail. Across Nov 2025 – Sep 2026 a 90% plan was met in 84% of hours and a 95% plan in 89% (January: 82% and 89%).
 - [docs/uncertainty.md](docs/uncertainty.md): three alternative bands were tested against a rule fixed in advance. None beat the current band on pinball loss, so it is kept.
 - [docs/correction.md](docs/correction.md): a level-aware correction, also tested against a rule fixed in advance, failed on the untouched Jan–Oct 2025 data (MAE lower in only 3 of 10 months), so the 7-day ratio is kept. [docs/data-usage.md](docs/data-usage.md) records which data has been used; future changes must be confirmed on Nov 2026+ data.
 
