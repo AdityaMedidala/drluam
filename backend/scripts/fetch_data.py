@@ -111,6 +111,8 @@ def main() -> None:
     p.add_argument("--first-delivery", default="2026-01-02")
     p.add_argument("--last-delivery", default="2026-02-01")
     p.add_argument("--out-dir", type=Path, default=DATA_DIR, help="where to write the CSVs and manifest")
+    p.add_argument("--allow-gaps", action="store_true",
+                   help="analysis fetches only: keep going when FUELHH has missing half-hours and list them in the manifest")
     args = p.parse_args()
     out_dir = args.out_dir
 
@@ -126,7 +128,10 @@ def main() -> None:
     actuals = fetch_actuals(act_start, act_end)
     gaps = missing_half_hours(actuals)
     if len(gaps):
-        sys.exit(f"FUELHH is missing {len(gaps)} half-hours, e.g. {[str(g) for g in gaps[:5]]}")
+        message = f"FUELHH is missing {len(gaps)} half-hours, e.g. {[str(g) for g in gaps[:5]]}"
+        if not args.allow_gaps:
+            sys.exit(message)
+        print(f"{message} (kept: --allow-gaps)")
     # Forecasts published from the start of that history window up to the end of
     # the last decision day.
     pub_start = datetime.combine(first - history - timedelta(days=2), datetime.min.time(), timezone.utc)
@@ -146,6 +151,7 @@ def main() -> None:
             "requestedSettlementDates": [act_start.isoformat(), act_end.isoformat()],
             "startTimeRange": [str(actuals["startTime"].min()), str(actuals["startTime"].max())],
             "rows": len(actuals),
+            "missingHalfHours": [str(g) for g in gaps],
         },
         "forecasts": {
             "dataset": "WINDFOR",
