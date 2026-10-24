@@ -8,10 +8,15 @@ Usage (from the repo root):
     python backend/scripts/fetch_data.py
 
 Writes:
-    backend/data/actuals_wind.csv    startTime, settlementDate, settlementPeriod, generation
+    backend/data/actuals_wind.csv    startTime, settlementDate, settlementPeriod, publishTime, generation
     backend/data/forecasts_wind.csv  publishTime, startTime, generation
+    backend/data/manifest.json       fetch time, requested and actual ranges, row counts
+
+Exits non-zero (and writes nothing) if any chunk comes back empty or the
+actuals have missing half-hours, so a partial snapshot can't slip in silently.
 """
 import argparse
+import json
 import sys
 import time
 from datetime import date, datetime, timedelta, timezone
@@ -57,14 +62,23 @@ def fetch_actuals(start: date, end: date, chunk_days: int = 7) -> pd.DataFrame:
             {"settlementDateFrom": day.isoformat(), "settlementDateTo": chunk_end.isoformat(), "fuelType": "WIND"},
         )
         if not batch:
-            print("  WARNING: no rows returned for this chunk")
+            sys.exit(f"FUELHH returned no rows for {day} -> {chunk_end}")
         rows.extend(batch)
         day = chunk_end + timedelta(days=1)
 
     df = pd.DataFrame(rows)
     df = df[df["fuelType"] == "WIND"]  # belt and braces in case the filter is ignored
-    df = df[["startTime", "settlementDate", "settlementPeriod", "generation"]]
-    return df.drop_duplicates("startTime").sort_values("startTime")
+    df = df[["startTime", "settlementDate", "settlementPeriod", "publishTime", "generation"]]
+    # A half-hour can be republished; keep the latest publication of each.
+    df = df.sort_values(["startTime", "publishTime"]).drop_duplicates("startTime", keep="last")
+    return df.reset_index(drop=True)
+
+
+def missing_half_hours(actuals: pd.DataFrame) -> pd.DatetimeIndex:
+    """Half-hours between the first and last actual that have no row."""
+    times = pd.to_datetime(actuals["startTime"], utc=True)
+    expected = pd.date_range(times.min(), times.max(), freq="30min")
+    return expected.difference(times)
 
 
 def fetch_forecasts(start: datetime, end: datetime, chunk_hours: int = 24) -> pd.DataFrame:
@@ -78,7 +92,7 @@ def fetch_forecasts(start: datetime, end: datetime, chunk_hours: int = 24) -> pd
             {"publishDateTimeFrom": t.strftime("%Y-%m-%dT%H:%MZ"), "publishDateTimeTo": chunk_end.strftime("%Y-%m-%dT%H:%MZ")},
         )
         if not batch:
-            print("  WARNING: no rows returned for this chunk")
+            sys.exit(f"WINDFOR returned no rows for publish window {t:%Y-%m-%d %H:%M} -> {chunk_end:%Y-%m-%d %H:%M}")
         rows.extend(batch)
         t = chunk_end
 
@@ -98,7 +112,11 @@ def main() -> None:
     # Extra history before the first delivery day: the bias correction looks back
     # 7 days from each decision, so early-January decisions need late-December data.
     history = timedelta(days=9)
-    actuals = fetch_actuals(first - history, last + timedelta(days=1))
+    act_start, act_end = first - history, last + timedelta(days=1)
+    actuals = fetch_actuals(act_start, act_end)
+    gaps = missing_half_hours(actuals)
+    if len(gaps):
+        sys.exit(f"FUELHH is missing {len(gaps)} half-hours, e.g. {[str(g) for g in gaps[:5]]}")
     # Forecasts published from the start of that history window up to the end of
     # the last decision day.
     pub_start = datetime.combine(first - history - timedelta(days=2), datetime.min.time(), timezone.utc)
@@ -108,6 +126,25 @@ def main() -> None:
     DATA_DIR.mkdir(exist_ok=True)
     actuals.to_csv(DATA_DIR / "actuals_wind.csv", index=False)
     forecasts.to_csv(DATA_DIR / "forecasts_wind.csv", index=False)
+    manifest = {
+        "fetchedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "source": BASE,
+        "actuals": {
+            "dataset": "FUELHH (fuelType=WIND)",
+            "requestedSettlementDates": [act_start.isoformat(), act_end.isoformat()],
+            "startTimeRange": [str(actuals["startTime"].min()), str(actuals["startTime"].max())],
+            "rows": len(actuals),
+        },
+        "forecasts": {
+            "dataset": "WINDFOR",
+            "requestedPublishWindow": [pub_start.isoformat(), pub_end.isoformat()],
+            "publishTimeRange": [str(forecasts["publishTime"].min()), str(forecasts["publishTime"].max())],
+            "startTimeRange": [str(forecasts["startTime"].min()), str(forecasts["startTime"].max())],
+            "publishTimes": int(forecasts["publishTime"].nunique()),
+            "rows": len(forecasts),
+        },
+    }
+    (DATA_DIR / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"\nSaved {len(actuals):,} actual rows and {len(forecasts):,} forecast rows to {DATA_DIR}")
 
 
