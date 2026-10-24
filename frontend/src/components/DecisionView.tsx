@@ -3,7 +3,7 @@ import {
   Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { api, type DayResponse, type Meta, type PlanResponse } from "../api";
-import { fmtAxisGW, fmtDate, fmtDateTime, fmtGWh, fmtMW, fmtPct, fmtTime, shiftDate } from "../format";
+import { gwAxis, fmtDate, fmtDateTime, fmtGWh, fmtMW, fmtPct, fmtTime, shiftDate } from "../format";
 import { useChartColors } from "../theme";
 import { readParam, writeParam } from "../url";
 import PlanPanel, { CONFIDENCES } from "./PlanPanel";
@@ -120,7 +120,7 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
                 <ComposedChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke={c.grid} vertical={false} />
                   <XAxis dataKey="time" tickFormatter={fmtTime} ticks={sixHourTicks} stroke={c.axis} tickLine={false} fontSize={12} />
-                  <YAxis tickFormatter={fmtAxisGW} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} domain={[0, "auto"]} />
+                  <YAxis {...gwAxis(chartData.flatMap((p) => [p.forecast, p.high, showActual ? p.actual : null]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
                   <Tooltip content={<DayTooltip showActual={showActual} />} />
                   {hasCorrection && <Area dataKey="band" stroke="none" fill={c.band} fillOpacity={0.14} connectNulls isAnimationActive={false} />}
                   <Line dataKey="forecast" stroke={c.forecast} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />

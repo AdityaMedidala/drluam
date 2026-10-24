@@ -47,10 +47,19 @@ export function Insight({ children }: { children: ReactNode }) {
   return <div className="insight">{children}</div>;
 }
 
-export function Loading() {
-  return <div className="state">Loading…</div>;
+/** Placeholder blocks shaped like the content, so the layout doesn't jump when data arrives. */
+export function Loading({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className="skeleton" role="status" aria-live="polite" aria-label="Loading">
+      {Array.from({ length: rows }, (_, i) => <div key={i} className="skeleton-bar" />)}
+    </div>
+  );
 }
 
 export function ErrorState({ error }: { error: string }) {
-  return <div className="state state-error">Couldn't load data: {error}</div>;
+  return (
+    <div className="state state-error" role="alert">
+      <strong>Couldn't load this data.</strong> Check the API is running, then reload. <span className="muted">({error})</span>
+    </div>
+  );
 }

@@ -3,7 +3,7 @@ import {
   Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { api, type AccuracyResponse } from "../api";
-import { fmtAxisGW, fmtDate, fmtMW, fmtPct, fmtSignedMW } from "../format";
+import { fmtAxisGW, fmtDate, fmtMW, fmtPct, fmtSignedMW, gwAxis } from "../format";
 import { useChartColors, type ChartColors } from "../theme";
 import { ChartCard, ErrorState, Insight, LegendItem, Loading, StatTile } from "./ui";
 
@@ -34,7 +34,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
   const far = ahead[ahead.length - 1];
   const windiest = data.byLevel[data.byLevel.length - 1];
   const hist = data.histogram.map((b) => ({ ...b, mid: (b.from + b.to) / 2 }));
-  const daily = data.daily.map((d) => ({ ...d, label: fmtDate(d.deliveryDate) }));
+  const daily = data.daily.map((d) => ({ ...d, label: fmtDate(d.deliveryDate), short: fmtDate(d.deliveryDate).split(" ").slice(1).join(" ") }));
   const calibration = data.planCalibration;
   const hasDev = calibration.some((r) => r.developmentHitRate != null);
 
@@ -61,9 +61,6 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
         <StatTile label="Band coverage"
           value={fmtPct(band.coverage)}
           sub={<>Hours the actual fell inside the P10–P90 band (aim 80%) · {fmtPct(band.below)} below, {fmtPct(band.above)} above · avg width {fmtMW(band.meanWidth)}</>} />
-        <StatTile label="Raw error range (P10 – P90)"
-          value={<>{fmtSignedMW(raw.p10)} to {fmtSignedMW(raw.p90)}</>}
-          sub="80% of hourly raw-forecast errors fall in this range" />
       </div>
       <p className="footnote">
         Adjusted vs raw compared on the same {cmp.adjusted.n} hours ({cmp.days} delivery days); raw-only figures cover all {raw.n} hours,
@@ -120,6 +117,69 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
           </details>
         </ChartCard>
 
+        <ChartCard title="Day by day"
+          subtitle="Typical hourly error (MAE) for each delivery day — the adjustment tended to help most on days the raw forecast overshot"
+          legend={<><LegendItem color={c.forecast} label="Raw" /><LegendItem color={c.adjusted} label="Adjusted" /></>}
+        >
+          <div className="chart-md">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={daily} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={c.grid} vertical={false} />
+                <XAxis dataKey="short" stroke={c.axis} tickLine={false} fontSize={12} interval="preserveStartEnd" minTickGap={16} />
+                <YAxis {...gwAxis(daily.flatMap((d) => [d.maeRaw, d.maeAdjusted]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
+                <Tooltip content={({ active, payload }) =>
+                  active && payload?.length ? (
+                    <div className="tooltip">
+                      <div className="tooltip-title">{payload[0].payload.label}</div>
+                      <div className="tooltip-row"><span>Raw MAE</span><strong>{fmtMW(payload[0].payload.maeRaw)}</strong></div>
+                      <div className="tooltip-row"><span>Adjusted MAE</span><strong>{fmtMW(payload[0].payload.maeAdjusted)}</strong></div>
+                      <div className="tooltip-row"><span>Avg actual</span><strong>{fmtMW(payload[0].payload.actual)}</strong></div>
+                    </div>
+                  ) : null} />
+                <Line dataKey="maeRaw" stroke={c.forecast} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+                <Line dataKey="maeAdjusted" stroke={c.adjusted} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+
+        <ChartCard title="Bias by wind level"
+          subtitle={<>The windier the forecast, the more it overshoots: {fmtSignedMW(windiest.errorBias)} when it predicts {windiest.group}</>}
+          legend={<><LegendItem color={c.forecast} label="Raw" /><LegendItem color={c.adjusted} label="Adjusted" /></>}
+        >
+          <div className="chart-md">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.byLevel} barGap={2} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={c.grid} vertical={false} />
+                <XAxis dataKey="group" stroke={c.axis} tickLine={false} fontSize={12} />
+                <YAxis {...gwAxis(data.byLevel.flatMap((r) => [r.errorBias, r.adjErrorBias]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
+                <ReferenceLine y={0} stroke={c.axis} />
+                <Tooltip cursor={{ fill: c.grid }} content={<GroupTooltip c={c} metric="Bias" />} />
+                <Bar dataKey="errorBias" fill={c.forecast} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="adjErrorBias" fill={c.adjusted} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+
+        <ChartCard title="Error by lead time"
+          subtitle={<>All published forecasts · typical error grows from {fmtMW(near.errorMae)} at {near.group} to {fmtMW(far.errorMae)} at {far.group} — but even the freshest forecasts run {fmtSignedMW(near.errorBias)} high{elapsed && <>, and so do forecasts for hours that had <strong>already elapsed</strong> when published ({fmtSignedMW(elapsed.errorBias)}, leftmost point)</>}</>}
+          legend={<><LegendItem color={c.forecast} label="Typical error (MAE)" /><LegendItem color={c.forecast} label="Bias" dashed /></>}
+        >
+          <div className="chart-md">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.byHorizon} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={c.grid} vertical={false} />
+                <XAxis dataKey="group" tickFormatter={(g) => (g.startsWith("<0h") ? "elapsed" : g)} stroke={c.axis} tickLine={false} fontSize={12} />
+                <YAxis {...gwAxis(data.byHorizon.flatMap((r) => [r.errorMae, r.errorBias]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
+                <Tooltip content={<GroupTooltip c={c} rawOnly />} />
+                <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
+                <Line dataKey="errorBias" stroke={c.forecast} strokeWidth={2} strokeDasharray="5 4" dot={{ r: 4 }} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+
         <ChartCard title="How far off was each hour?"
           subtitle="Raw forecast minus actual, all hours · right of zero = forecast too high"
         >
@@ -143,43 +203,6 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
           </div>
         </ChartCard>
 
-        <ChartCard title="Error by lead time"
-          subtitle={<>All published forecasts · typical error grows from {fmtMW(near.errorMae)} at {near.group} to {fmtMW(far.errorMae)} at {far.group} — but even the freshest forecasts run {fmtSignedMW(near.errorBias)} high{elapsed && <>, and so do forecasts for hours that had <strong>already elapsed</strong> when published ({fmtSignedMW(elapsed.errorBias)}, leftmost point)</>}</>}
-          legend={<><LegendItem color={c.forecast} label="Typical error (MAE)" /><LegendItem color={c.forecast} label="Bias" dashed /></>}
-        >
-          <div className="chart-md">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.byHorizon} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid stroke={c.grid} vertical={false} />
-                <XAxis dataKey="group" tickFormatter={(g) => (g.startsWith("<0h") ? "elapsed" : g)} stroke={c.axis} tickLine={false} fontSize={12} />
-                <YAxis tickFormatter={fmtAxisGW} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} domain={[0, "auto"]} />
-                <Tooltip content={<GroupTooltip c={c} rawOnly />} />
-                <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
-                <Line dataKey="errorBias" stroke={c.forecast} strokeWidth={2} strokeDasharray="5 4" dot={{ r: 4 }} isAnimationActive={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
-
-        <ChartCard title="Bias by wind level"
-          subtitle={<>The windier the forecast, the more it overshoots: {fmtSignedMW(windiest.errorBias)} when it predicts {windiest.group}</>}
-          legend={<><LegendItem color={c.forecast} label="Raw" /><LegendItem color={c.adjusted} label="Adjusted" /></>}
-        >
-          <div className="chart-md">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.byLevel} barGap={2} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid stroke={c.grid} vertical={false} />
-                <XAxis dataKey="group" stroke={c.axis} tickLine={false} fontSize={12} />
-                <YAxis tickFormatter={fmtAxisGW} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
-                <ReferenceLine y={0} stroke={c.axis} />
-                <Tooltip cursor={{ fill: c.grid }} content={<GroupTooltip c={c} metric="Bias" />} />
-                <Bar dataKey="errorBias" fill={c.forecast} radius={[4, 4, 0, 0]} isAnimationActive={false} />
-                <Bar dataKey="adjErrorBias" fill={c.adjusted} radius={[4, 4, 0, 0]} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
-
         <ChartCard title="Error by hour of day"
           subtitle="Typical error (MAE) for each delivery hour, UK time"
           legend={<><LegendItem color={c.forecast} label="Raw" /><LegendItem color={c.adjusted} label="Adjusted" /></>}
@@ -189,36 +212,10 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
               <LineChart data={data.byHour} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke={c.grid} vertical={false} />
                 <XAxis dataKey="group" tickFormatter={(h) => `${String(h).padStart(2, "0")}:00`} interval={3} stroke={c.axis} tickLine={false} fontSize={12} />
-                <YAxis tickFormatter={fmtAxisGW} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} domain={[0, "auto"]} />
+                <YAxis {...gwAxis(data.byHour.flatMap((r) => [r.errorMae, r.adjErrorMae]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} />
                 <Tooltip content={<GroupTooltip c={c} metric="MAE" hour />} />
                 <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={2} dot={false} isAnimationActive={false} />
                 <Line dataKey="adjErrorMae" stroke={c.adjusted} strokeWidth={2} dot={false} isAnimationActive={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
-
-        <ChartCard wide title="Day by day"
-          subtitle="Typical hourly error (MAE) for each delivery day — the adjustment tended to help most on days the raw forecast overshot"
-          legend={<><LegendItem color={c.forecast} label="Raw" /><LegendItem color={c.adjusted} label="Adjusted" /></>}
-        >
-          <div className="chart-md">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={daily} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-                <CartesianGrid stroke={c.grid} vertical={false} />
-                <XAxis dataKey="label" stroke={c.axis} tickLine={false} fontSize={12} interval={3} />
-                <YAxis tickFormatter={fmtAxisGW} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={60} domain={[0, "auto"]} />
-                <Tooltip content={({ active, payload }) =>
-                  active && payload?.length ? (
-                    <div className="tooltip">
-                      <div className="tooltip-title">{payload[0].payload.label}</div>
-                      <div className="tooltip-row"><span>Raw MAE</span><strong>{fmtMW(payload[0].payload.maeRaw)}</strong></div>
-                      <div className="tooltip-row"><span>Adjusted MAE</span><strong>{fmtMW(payload[0].payload.maeAdjusted)}</strong></div>
-                      <div className="tooltip-row"><span>Avg actual</span><strong>{fmtMW(payload[0].payload.actual)}</strong></div>
-                    </div>
-                  ) : null} />
-                <Line dataKey="maeRaw" stroke={c.forecast} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
-                <Line dataKey="maeAdjusted" stroke={c.adjusted} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -235,7 +232,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
           <li><strong>Error</strong> = forecast − actual. Positive means the forecast was too high, i.e. the risk of buying too little.</li>
           <li><strong>Period:</strong> every figure on this page covers decisions made in January 2026, i.e. delivery days {fmtDate(data.period.firstDelivery)} – {fmtDate(data.period.lastDelivery)}, hourly, unless it says Nov 2025 – Sep 2026.</li>
           <li><strong>Typical error (MAE):</strong> the average of |error| over those hours. <strong>Error as share of output (nMAE):</strong> MAE ÷ average actual generation. <strong>Bias:</strong> the average error, with its sign.</li>
-          <li><strong>Bias removed:</strong> 1 − adjusted bias ÷ raw bias, on the same hours. <strong>Raw error range:</strong> the 10th and 90th percentiles of hourly raw errors.</li>
+          <li><strong>Bias removed:</strong> 1 − adjusted bias ÷ raw bias, on the same hours.</li>
           <li><strong>Plan hit rate:</strong> the share of hours the actual came in at or above a "plan on" level (target = the level). The Nov 2025 – Sep 2026 figures come from the same method run offline on those months (7,775 hours) and are shown at the 09:00/09:20 cutoffs only.</li>
           <li>All figures are measured on past data. They describe how the method did, not a guarantee of how it will do.</li>
         </ul>

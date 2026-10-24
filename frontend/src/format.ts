@@ -33,5 +33,16 @@ export const shiftDate = (isoDate: string, days: number) => {
 
 export const fmtAxisGW = (v: number) => {
   const gw = v / 1000;
-  return `${Number.isInteger(gw) ? gw.toFixed(0) : gw.toFixed(1)} GW`;
+  return `${(Number.isInteger(gw) ? gw.toFixed(0) : gw.toFixed(1)).replace("-", "−")} GW`;
 };
+
+/** Y-axis props with whole-GW steps (1/2/5/10 GW) covering the data, always including 0. */
+export function gwAxis(values: (number | null | undefined)[]) {
+  const v = values.filter((x): x is number => x != null && Number.isFinite(x));
+  const lo = Math.min(0, ...v);
+  const hi = Math.max(0, ...v);
+  const step = [1000, 2000, 5000, 10000].find((s) => (hi - lo) / s <= 6) ?? 10000;
+  const ticks: number[] = [];
+  for (let t = Math.floor(lo / step) * step; t <= Math.ceil(hi / step) * step; t += step) ticks.push(t);
+  return { ticks, domain: [ticks[0], ticks[ticks.length - 1]] as [number, number], tickFormatter: fmtAxisGW };
+}
