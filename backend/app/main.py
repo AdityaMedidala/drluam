@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse
 from . import analysis as an
 from .data import FIRST_DELIVERY, LAST_DELIVERY, load_actuals, load_forecasts
 
-DEFAULT_CUTOFF = "09:00"
+DEFAULT_CUTOFF = "09:20"  # EPEX day-ahead gate closure
 CUTOFF_OPTIONS = ["06:00", "08:00", "09:00", "09:20", "09:30", "09:50", "10:00", "11:00"]
 
 @asynccontextmanager

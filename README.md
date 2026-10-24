@@ -10,7 +10,7 @@ A web app for a UK utility's day-ahead power buying team. It answers two questio
 
 ---
 
-## Key findings (January 2026 decisions, 09:00 UK cutoff)
+## Key findings (January 2026 decisions, 09:20 UK cutoff, the EPEX gate)
 
 | | Raw forecast | Adjusted forecast |
 |---|---|---|
@@ -37,7 +37,7 @@ flowchart LR
   API --> UI[React + Recharts<br/>Decision view / Accuracy view]
 ```
 
-**Picking the decision forecast.** GB day-ahead auctions close around 09:20–09:50 UK time on the day before delivery. For every target hour on delivery day D, the app uses the **latest WINDFOR forecast published at or before the cutoff on D−1** (default 09:00 UK, adjustable in the UI). The selector includes 09:20 (EPEX) and 09:50 (N2EX) gate closures. In January, 09:20 picks the same forecasts as 09:00. 09:50 picks up a later run, which moves raw MAE from 2,022 to 1,996 MW and band coverage from 69.1% to 69.4%. Forecasts published later are ignored, because the desk could not have used them. Using the newest forecast instead would overstate accuracy.
+**Picking the decision forecast.** GB day-ahead auctions close around 09:20–09:50 UK time on the day before delivery. For every target hour on delivery day D, the app uses the **latest WINDFOR forecast published at or before the cutoff on D−1** (default 09:20 UK, the EPEX gate closure, adjustable in the UI). No WINDFOR run is published between 09:00 and 09:20 UK in any month fetched, so 09:20 gives the same results as 09:00, and the 09:00-based analyses in `docs/` apply unchanged. The 09:50 option (the N2EX gate) shows what waiting buys: it picks up the 09:30 run, which moves January raw MAE from 2,022 to 1,996 MW and band coverage from 69.1% to 69.4%. Forecasts published later are ignored, because the desk could not have used them. Using the newest forecast instead would overstate accuracy.
 
 **Scope.** "Decisions made in January 2026" means delivery days **2 Jan – 1 Feb 2026**.
 
@@ -45,7 +45,7 @@ flowchart LR
 
 **Time alignment.** WINDFOR is hourly and FUELHH is half-hourly. Accuracy is measured on the hour. Interpolating forecasts to half-hours gave the same results (MAE 2,021 vs 2,022 MW). Charts show actuals at full half-hourly resolution.
 
-**Adjusted forecast and band.** For delivery day D: ratio = Σactual / Σforecast over the previous 7 days of hours whose actuals were already known at the cutoff. Adjusted forecast = forecast × ratio. The band is the adjusted forecast + the P10/P90 of out-of-sample residuals over that same window: for each history hour, actual minus that day's own adjusted forecast (made with its own prior ratio), so the band reflects errors the method really made. In January the actual fell inside the band in 69% of hours at a 09:00 cutoff, not the nominal 80%; the app shows the measured figure. A test checks that nothing from after the cutoff is used.
+**Adjusted forecast and band.** For delivery day D: ratio = Σactual / Σforecast over the previous 7 days of hours whose actuals were already known at the cutoff. Adjusted forecast = forecast × ratio. The band is the adjusted forecast + the P10/P90 of out-of-sample residuals over that same window: for each history hour, actual minus that day's own adjusted forecast (made with its own prior ratio), so the band reflects errors the method really made. In January the actual fell inside the band in 69% of hours at the 09:20 cutoff, not the nominal 80%; the app shows the measured figure. A test checks that nothing from after the cutoff is used.
 
 **When an actual counts as known.** A FUELHH half-hour is treated as known once it has ended (startTime + 30 min ≤ cutoff), i.e. assuming it is published with no lag. The snapshot supports this: 99.8% of half-hours carry a publishTime within 5 minutes of the period end. If Elexon's real availability lagged, the last half-hour or so before the cutoff would drop out of a 168-hour window.
 
@@ -158,7 +158,7 @@ Outside the app; each analysis runs the app's own logic unchanged on other month
 
 - **The band holds the actual in 69% of hours, not 80%.** Errors are strongly correlated within a day, so the trailing week's 168 hourly residuals are really about seven day-sized draws, and the band under-covers when conditions shift between that week and the delivery day. On the worst days the actual fell outside the band in every hour: 2, 11, 21 and 28 Jan. Each was a day when the actual/forecast ratio dropped well below the trailing week's (28 Jan: 0.52 vs 0.87), consistent with curtailment or other output losses changing, though that cause is not confirmed with these two datasets.
 - **One month.** All app figures are January 2026 only.
-- **Summer run timing.** WINDFOR's run schedule shifts with British Summer Time. In winter the last run before a 09:00 UK cutoff is the 07:30 run; in summer there is no 07:30 run, so the decision uses the 06:30 run, an hour older. This doesn't affect the January app, but it matters if the scope extends into summer.
+- **Summer run timing.** WINDFOR's run schedule shifts with British Summer Time. In winter the last run before the 09:20 UK cutoff is the 07:30 run; in summer there is no 07:30 run, so the decision uses the 06:30 run, an hour older. This doesn't affect the January app, but it matters if the scope extends into summer.
 
 ## Next steps
 

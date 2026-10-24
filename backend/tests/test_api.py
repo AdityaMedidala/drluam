@@ -38,6 +38,14 @@ def test_auction_gate_closures_are_offered(cutoff):
     assert r.json()["decisionTimeUtc"] == f"2026-01-14T{cutoff}:00Z"
 
 
+def test_default_cutoff_is_epex_gate_and_matches_0900_in_january():
+    assert client.get("/api/meta").json()["defaultCutoff"] == "09:20"
+    # No WINDFOR run is published between 09:00 and 09:20 UK, so the two agree.
+    a = client.get("/api/accuracy", params={"cutoff": "09:00"}).json()
+    b = client.get("/api/accuracy").json()
+    assert {k: v for k, v in a.items() if k != "cutoff"} == {k: v for k, v in b.items() if k != "cutoff"}
+
+
 @pytest.mark.parametrize("cutoff", ["nine", "09:15", "25:00"])
 def test_cutoff_outside_options_is_422(cutoff):
     assert client.get("/api/accuracy", params={"cutoff": cutoff}).status_code == 422

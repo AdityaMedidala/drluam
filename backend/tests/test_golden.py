@@ -23,7 +23,10 @@ def pct(v):
 
 @pytest.fixture(scope="module")
 def acc():
-    return TestClient(app).get("/api/accuracy", params={"cutoff": "09:00"}).json()
+    # The README headline numbers are for the default cutoff, the EPEX gate.
+    body = TestClient(app).get("/api/accuracy").json()
+    assert body["cutoff"] == "09:20"
+    return body
 
 
 def headline(acc):

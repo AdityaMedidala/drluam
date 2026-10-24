@@ -4,13 +4,16 @@ import AccuracyView from "./components/AccuracyView";
 import DecisionView from "./components/DecisionView";
 import { ErrorState, Loading } from "./components/ui";
 
+// GB day-ahead auction gate closures (UK time).
+const GATES: Record<string, string> = { "09:20": "EPEX gate", "09:50": "N2EX gate" };
+
 type Tab = "decision" | "accuracy";
 
 export default function App() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("decision");
-  const [cutoff, setCutoff] = useState("09:00");
+  const [cutoff, setCutoff] = useState("09:20");
 
   useEffect(() => {
     api.meta().then((m) => { setMeta(m); setCutoff(m.defaultCutoff); }).catch((e) => setError(String(e)));
@@ -32,7 +35,7 @@ export default function App() {
           <label className="cutoff">
             <span className="muted">Decision cutoff (UK, day before)</span>
             <select value={cutoff} onChange={(e) => setCutoff(e.target.value)}>
-              {meta.cutoffOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+              {meta.cutoffOptions.map((o) => <option key={o} value={o}>{o}{GATES[o] ? ` (${GATES[o]})` : ""}</option>)}
             </select>
           </label>
         )}
