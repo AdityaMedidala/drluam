@@ -70,3 +70,18 @@ Yes. Scaling by the ratio beats subtracting last week's mean error on MAE in eve
 ## Conclusion
 
 The multiplicative correction generalises. In every month from November to March it removes most of the bias and beats both the raw forecast and the additive baseline on MAE, so it is not a January artefact. Where it fails is uncertainty: the band holds the actual in only 64–73% of hours against an 80% target, and is worst in February. Its gains are also uneven: November's MAE improves by only 10%, and in January the actual fell outside the band in every hour on four days when the actual/forecast ratio dropped well below the trailing week's. Widening the residual window to 14 days improves coverage in every month but still never reaches 80%. These five months were all used to see that, so a calibrated band should be fixed in advance and confirmed on months not used here before it changes the app.
+
+## Addendum (24 Oct 2026): the 14-day band on Apr – Sep 2026
+
+This page never set a rule for the 14-day band. The conclusion above only said one should be fixed in advance. So no rule was applied, and none is invented here: Apr–Sep 2026 had already been seen in `docs/uncertainty.md`, so a rule written now would not be a real test. The numbers below are a description, not a confirmation. The data is the same as in `docs/uncertainty.md`, with nothing before 1 Nov 2025 and the ratio fixed at 7 days.
+
+| decision month | 7d coverage | 14d coverage | 7d width (MW) | 14d width (MW) | 7d P10/P90 pinball | 14d P10/P90 pinball |
+|---|---|---|---|---|---|---|
+| 2026-04 | 73% | 81% | 3,529 | 3,880 | 272 | 259 |
+| 2026-05 | 68% | 74% | 2,898 | 3,012 | 244 | 226 |
+| 2026-06 | 78% | 78% | 3,184 | 3,279 | 253 | 243 |
+| 2026-07 | 75% | 77% | 2,673 | 2,624 | 253 | 252 |
+| 2026-08 | 74% | 77% | 2,716 | 2,943 | 252 | 235 |
+| 2026-09 | 63% | 68% | 3,627 | 3,749 | 326 | 312 |
+
+The 14-day residual window again raises coverage, in 5 of 6 months with June tied, and lowers P10/P90 pinball loss in all 6. Coverage reaches 75–85% in 4 of 6 months. That makes it the most promising band change seen so far. It is not adopted: it has to be pre-registered and confirmed on data from November 2026 onwards (see `docs/data-usage.md`).
