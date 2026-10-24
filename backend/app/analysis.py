@@ -19,6 +19,7 @@ import pandas as pd
 UK_TZ = "Europe/London"
 TRAILING_DAYS = 7          # history used for the bias correction and the uncertainty band
 MIN_HISTORY_POINTS = 24    # need at least a day of matched hours before correcting
+ACTUAL_PERIOD = pd.Timedelta(minutes=30)  # FUELHH settlement period length
 
 
 # --------------------------------------------------------------------------- selection
@@ -72,7 +73,7 @@ def build_decision_frame(
 
     Adjusted forecast: raw forecast x ratio (sum actual / sum forecast) over the
     previous `trailing_days` of hours whose actuals were already known at the
-    decision cutoff. Band: adjusted forecast + P10 / P90 of the residuals over
+    decision cutoff (half-hour ended, i.e. startTime + 30 min <= cutoff). Band: adjusted forecast + P10 / P90 of the residuals over
     that same history. No information from after the cutoff is used.
     """
     frame = select_decision_forecast(forecasts, cutoff)
@@ -80,9 +81,11 @@ def build_decision_frame(
     frame = frame.rename(columns={"generation": "actual"}).sort_values("startTime").reset_index(drop=True)
 
     known = frame.dropna(subset=["actual"])
+    # A FUELHH half-hour is only known once it has ended (publication lag assumed ~0).
+    known_at = known["startTime"] + ACTUAL_PERIOD
     per_day = []
     for day, cutoff_utc in frame.groupby("deliveryDate")["cutoffUtc"].first().items():
-        hist = known[(known["startTime"] < cutoff_utc) & (known["startTime"] >= cutoff_utc - pd.Timedelta(days=trailing_days))]
+        hist = known[(known_at <= cutoff_utc) & (known_at > cutoff_utc - pd.Timedelta(days=trailing_days))]
         if len(hist) < MIN_HISTORY_POINTS:
             per_day.append((day, np.nan, np.nan, np.nan, len(hist)))
             continue

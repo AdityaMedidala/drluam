@@ -1,6 +1,7 @@
 from datetime import time
 
 import pandas as pd
+import pytest
 
 from app.analysis import select_decision_forecast
 
@@ -64,22 +65,23 @@ def _hourly(start, hours):
     return pd.date_range(start, periods=hours, freq="1h", tz="UTC")
 
 
-def test_correction_uses_only_actuals_known_before_cutoff():
-    # Forecast is always 2x the actual for 3 days of history, then on the delivery day
-    # the actual jumps. The correction must NOT see the delivery-day actuals.
-    times = _hourly("2026-01-07T00:00", 4 * 24)
-    actual_vals = [100.0] * (3 * 24) + [10_000.0] * 24
-    actuals = pd.DataFrame({"startTime": times, "generation": actual_vals})
-    # One forecast per target hour, published well before each D-1 09:00 cutoff.
-    forecasts = pd.DataFrame({
-        "publishTime": times - pd.Timedelta(hours=30),
-        "startTime": times,
-        "generation": 200.0,
-    })
-    frame = build_decision_frame(forecasts, actuals, time(9, 0))
+@pytest.mark.parametrize("cutoff", [time(9, 0), time(9, 15)])
+def test_correction_uses_only_actuals_known_before_cutoff(cutoff):
+    # Forecast is always 200. Every actual already known at the D-1 cutoff is 100
+    # (ratio 0.5); every actual not yet known -- the rest of D-1 and all of D -- is
+    # 10,000. A FUELHH half-hour is known only once it has ended (startTime + 30 min),
+    # so with a 09:15 cutoff the 09:00 hour is NOT known yet.
+    times = _hourly("2026-01-01T00:00", 10 * 24)
+    cutoff_utc = pd.Timestamp(f"2026-01-09T{cutoff:%H:%M}", tz="UTC")  # GMT in January
+    known = times + pd.Timedelta(minutes=30) <= cutoff_utc
+    actuals = pd.DataFrame({"startTime": times, "generation": [100.0 if k else 10_000.0 for k in known]})
+    # Published two days ahead, so every hour has a decision forecast.
+    forecasts = pd.DataFrame({"publishTime": times - pd.Timedelta(hours=48), "startTime": times, "generation": 200.0})
+
+    frame = build_decision_frame(forecasts, actuals, cutoff)
     last_day = frame[frame.deliveryDate == pd.Timestamp("2026-01-10").date()]
-    # History up to 09:00 on 9 Jan has actual/forecast = 0.5 -> adjusted = 100, not ~10,000.
-    assert last_day.ratio.round(6).unique().tolist() == [0.5]
+    assert last_day.historyPoints.unique().tolist() == [168]   # a full week of known hours
+    assert last_day.ratio.round(6).unique().tolist() == [0.5]  # no post-cutoff actual leaked in
     assert last_day.adjusted.round(6).unique().tolist() == [100.0]
 
 
