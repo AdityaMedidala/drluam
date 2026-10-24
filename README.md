@@ -79,8 +79,8 @@ flowchart LR
 │   │   └── theme.ts         # chart colours (colour-blind safe, light/dark)
 │   ├── Dockerfile           # build with Node, serve with nginx
 │   └── nginx.conf           # serves the SPA, proxies /api to the backend
-├── analysis/                # out-of-app validation: validate.py + Nov 2025 – Mar 2026 data (not deployed)
-├── docs/validation.md       # validation and sensitivity tables
+├── analysis/                # out-of-app scripts + Jan 2025 – Sep 2026 data (not deployed)
+├── docs/                    # validation, error anatomy, uncertainty, correction, data-usage log
 ├── docker-compose.yml
 └── vercel.json              # Vercel Services: frontend at /, FastAPI at /api
 ```
@@ -136,21 +136,27 @@ Deployed on Vercel as one project using [Vercel Services](https://vercel.com/doc
 - **Analysis logic kept free of I/O.** All of it lives in `analysis.py`, so it can be unit-tested directly.
 - **Simple, explainable correction.** A multiplicative trailing ratio was chosen over a fitted model because the client can understand and audit it. A level-dependent correction is a natural next step, since the bias grows with wind level.
 
-## Validation on other months
+## Deeper analysis
 
-The same method, run unchanged on decisions from Nov 2025 to Mar 2026, removes 82–102% of the bias and cuts MAE by 10–54% in every month, and beats a simpler "subtract last week's mean error" baseline every month. The band under-covers in every month (64–73% vs 80%); 14 days of residuals helps everywhere but never reaches 80%. Details and sensitivity tables (ratio window, band window, cutoff, baseline): [docs/validation.md](docs/validation.md).
+Outside the app; each analysis runs the app's own logic unchanged on other months.
+
+- [docs/validation.md](docs/validation.md): on Nov 2025 – Mar 2026 the correction removes 82–102% of the bias and cuts MAE by 10–54% in every month. The band under-covers everywhere (64–73% vs 80%).
+- [docs/error-anatomy.md](docs/error-anatomy.md): across Nov 2025 – Sep 2026 the error is mostly whole-day level, not timing (a per-day level fix would remove 55% of MAE, a time shift 17%). The forecast catches only half of >2 GW ramps.
+- [docs/uncertainty.md](docs/uncertainty.md): three alternative bands were tested against a rule fixed in advance. None beat the current band on pinball loss, so it is kept.
+- [docs/correction.md](docs/correction.md): a level-aware correction, also tested against a rule fixed in advance, failed on the untouched Jan–Oct 2025 data (MAE lower in only 3 of 10 months), so the 7-day ratio is kept. [docs/data-usage.md](docs/data-usage.md) records which data has been used; future changes must be confirmed on Nov 2026+ data.
 
 ## Limitations
 
 - **The band holds the actual in 69% of hours, not 80%.** Errors are strongly correlated within a day, so the trailing week's 168 hourly residuals are really about seven day-sized draws, and the band under-covers when conditions shift between that week and the delivery day. On the worst days the actual fell outside the band in every hour: 2, 11, 21 and 28 Jan. Each was a day when the actual/forecast ratio dropped well below the trailing week's (28 Jan: 0.52 vs 0.87), consistent with curtailment or other output losses changing, though that cause is not confirmed with these two datasets.
-- **One month.** All figures are January 2026 only.
+- **One month.** All app figures are January 2026 only.
+- **Summer run timing.** WINDFOR's run schedule shifts with British Summer Time. In winter the last run before a 09:00 UK cutoff is the 07:30 run; in summer there is no 07:30 run, so the decision uses the 06:30 run, an hour older. This doesn't affect the January app, but it matters if the scope extends into summer.
 
 ## Next steps
 
 - Add more months to test whether the bias pattern persists.
 - Add other renewables and demand forecasts, so the app shows the actual residual volume to buy.
-- Calibrated bands, chosen only after out-of-sample validation on other months, not tuned on January.
-- A level-dependent correction, since the bias grows with wind level.
+- A better-calibrated band. Three reshaped bands failed (docs/uncertainty.md); the most promising lead, a 14-day residual window, must be pre-registered and confirmed on Nov 2026+ data.
+- Inputs that explain whole-day level errors (curtailment, demand, day type). A simple level-banded ratio failed its test (docs/correction.md).
 - Schedule automatic data refreshes.
 
 ## Use of AI tools
