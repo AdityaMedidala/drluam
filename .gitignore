@@ -17,3 +17,7 @@ research/
 
 # Analysis data is rebuilt with fetch_data.py; only the manifests (with sha256) are committed
 analysis/**/*.csv
+
+# Playwright output
+frontend/test-results/
+frontend/playwright-report/
