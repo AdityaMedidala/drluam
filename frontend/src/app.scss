@@ -1,0 +1,94 @@
+// IBM Carbon (g10 light default, g100 dark via <Theme>), IBM Plex from the per-family packages.
+@use '@carbon/react/scss/config' with (
+  $font-path: '@ibm/plex',
+  $use-per-family-plex: true,
+);
+@use '@carbon/react';
+@use '@carbon/react/scss/spacing' as *;
+
+// ---------------------------------------------------------------- page
+html, body { margin: 0; }
+html[data-theme='dark'] body { background: #161616; }   // no flash before React mounts
+.app-theme { min-height: 100vh; background: var(--cds-background); color: var(--cds-text-primary); }
+.num, .cds--structured-list-td { font-variant-numeric: tabular-nums; }
+
+// fixed 48px Carbon header + the control bar (labelled md controls: 82px)
+$bar: 82px;
+$chrome: 48px + $bar;
+.control-bar {
+  position: sticky; top: 48px; z-index: 5;
+  display: flex; align-items: flex-end; gap: $spacing-05; flex-wrap: wrap;
+  margin-top: 48px; padding: $spacing-03 $spacing-07; height: $bar;
+  background: var(--cds-layer-01); border-bottom: 1px solid var(--cds-border-subtle-01);
+}
+.control-bar .date-group { display: flex; align-items: flex-end; gap: 2px; }
+.control-bar .cds--content-switcher { width: auto; }
+.control-bar .spacer { flex: 1; }
+
+.page { max-width: 1600px; margin: 0 auto; padding: $spacing-05 $spacing-07; }
+
+// ---------------------------------------------------------------- tiles and text
+.tile { display: flex; flex-direction: column; min-width: 0; padding: $spacing-05; border: 1px solid var(--cds-border-subtle-01); }
+.tile h2, .tile h3 { margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.375; }
+.sub { margin: 2px 0 $spacing-03; font-size: 0.875rem; color: var(--cds-text-secondary); }
+.source { margin-top: $spacing-02; font-size: 0.75rem; color: var(--cds-text-helper); }
+.label { font-size: 0.875rem; color: var(--cds-text-secondary); }
+.hero { margin: $spacing-02 0 0; font-size: 3rem; font-weight: 400; line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.hero .unit { font-size: 1.25rem; color: var(--cds-text-secondary); margin-left: $spacing-02; }
+.delta { margin: $spacing-02 0 $spacing-05; font-size: 0.875rem; color: var(--cds-text-secondary); }
+.run { margin-top: $spacing-03; font-size: 0.75rem; color: var(--cds-text-helper); white-space: nowrap; }
+.warn { font-size: 0.75rem; color: var(--cds-text-error); }
+.decision-list { margin-bottom: 0; }
+.decision-list .cds--structured-list-td:last-child { text-align: right; white-space: nowrap; }
+.drift { margin-top: $spacing-05; padding-top: $spacing-05; border-top: 1px solid var(--cds-border-subtle-01); }
+.drift h3 { font-size: 0.875rem; }
+.figures { display: flex; flex-wrap: wrap; gap: $spacing-05 $spacing-09; margin: $spacing-06 0; }
+.figures div { display: flex; align-items: baseline; gap: $spacing-03; }
+.figures b { font-size: 2rem; font-weight: 400; font-variant-numeric: tabular-nums; }
+.figures span { color: var(--cds-text-secondary); font-size: 0.875rem; }
+
+// ---------------------------------------------------------------- Decision: fit to the viewport
+.decision { display: grid; grid-template-columns: minmax(300px, 340px) 1fr; gap: $spacing-05; }
+@media (min-width: 1056px) {
+  .decision > .tile { height: calc(100vh - #{$chrome} - 2 * #{$spacing-05}); }
+  .decision .main-plot { flex: 1; min-height: 0; }
+}
+.main-plot { height: 320px; }
+.drift-plot { height: 150px; }
+.decision-left { overflow: hidden; }
+
+// ---------------------------------------------------------------- Accuracy
+.acc-top-plot { height: 260px; }
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: $spacing-05; }
+.three .plot { height: 240px; }
+.stack { display: flex; flex-direction: column; gap: $spacing-07; }
+.diag-plot { height: 220px; }
+.section-gap { margin-top: $spacing-07; }
+
+// ---------------------------------------------------------------- charts (Carbon data-viz styling)
+.recharts-text, .recharts-cartesian-axis-tick-value { font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; }
+.chart-tooltip {
+  min-width: 180px; padding: $spacing-03 $spacing-04; font-size: 0.75rem;
+  background: var(--cds-layer-01); color: var(--cds-text-primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+.chart-tooltip .t-title { font-weight: 600; margin-bottom: $spacing-02; }
+.chart-tooltip .t-row { display: flex; justify-content: space-between; gap: $spacing-05; font-variant-numeric: tabular-nums; }
+.chart-tooltip .swatch { display: inline-block; width: 8px; height: 8px; margin-right: $spacing-02; }
+
+.methodology ul { margin: 0; padding-left: $spacing-05; list-style: disc; display: grid; gap: $spacing-03; max-width: 75ch; color: var(--cds-text-secondary); }
+.provenance { margin-top: $spacing-07; padding-top: $spacing-04; border-top: 1px solid var(--cds-border-subtle-01); font-size: 0.75rem; color: var(--cds-text-helper); }
+.provenance .bad { color: var(--cds-text-error); }
+
+// ---------------------------------------------------------------- small screens: the panel stacks above the chart
+@media (max-width: 1055px) {
+  .decision { grid-template-columns: 1fr; }
+  .three { grid-template-columns: 1fr; }
+}
+@media (max-width: 1055px) { .control-bar { height: auto; } }
+@media (max-width: 671px) {
+  .control-bar, .page { padding-left: $spacing-05; padding-right: $spacing-05; }
+  .hero { font-size: 2.25rem; }
+  .main-plot { height: 280px; }
+  .run { white-space: normal; }
+}

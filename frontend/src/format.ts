@@ -36,17 +36,30 @@ export const fmtAxisGW = (v: number) => {
   return `${(Number.isInteger(gw) ? gw.toFixed(0) : gw.toFixed(1)).replace("-", "−")} GW`;
 };
 
-/** Y-axis props with whole-GW steps (1/2/5/10 GW) covering the data, always including 0. */
+/** Y-axis props: starts at 0 (or the round step below a negative minimum) and ends at the smallest
+ *  round value just above the data, with at most six whole-GW steps. */
 export function gwAxis(values: (number | null | undefined)[]) {
   const v = values.filter((x): x is number => x != null && Number.isFinite(x));
   const lo = Math.min(0, ...v);
   const hi = Math.max(0, ...v);
-  const step = [1000, 2000, 5000, 10000].find((s) => (hi - lo) / s <= 6) ?? 10000;
-  const ticks: number[] = [];
-  for (let t = Math.floor(lo / step) * step; t <= Math.ceil(hi / step) * step; t += step) ticks.push(t);
+  // Smallest round top wins; on a tie prefer a "nice" step (1/2/5/10 GW), then the finer one.
+  const nice = (step: number) => [1000, 2000, 5000, 10000].includes(step);
+  let best: { ticks: number[]; top: number; step: number } | null = null;
+  for (const step of [1000, 2000, 3000, 4000, 5000, 10000]) {
+    const bottom = Math.floor(lo / step) * step;
+    const top = Math.max(step, Math.ceil(hi / step) * step);
+    if ((top - bottom) / step > 6) continue;
+    const better = !best || top - bottom < best.top || (top - bottom === best.top
+      && (nice(step) && !nice(best.step) || (nice(step) === nice(best.step) && step < best.step)));
+    if (better) {
+      const ticks: number[] = [];
+      for (let t = bottom; t <= top; t += step) ticks.push(t);
+      best = { ticks, top: top - bottom, step };
+    }
+  }
+  const ticks = best!.ticks;
   return { ticks, domain: [ticks[0], ticks[ticks.length - 1]] as [number, number], tickFormatter: fmtAxisGW };
 }
-
 /** Whole GWh, for headline sentences. */
 export const fmtGWh0 = (mwh: number | null | undefined) =>
   mwh == null ? "–" : `${Math.round(mwh / 1000).toLocaleString("en-GB")} GWh`;

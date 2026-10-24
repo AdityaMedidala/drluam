@@ -7,19 +7,19 @@ const LIGHT = {
   forecast: "#eb6834",
   adjusted: "#2a78d6",
   band: "#2a78d6",
-  grid: "#ecebe7",
-  axis: "#6f6c64",
+  grid: "#e0e0e0",      // Carbon gray-20 gridlines (g10)
+  axis: "#525252",      // Carbon text-secondary (g10)
   surface: "#ffffff",
   bandOpacity: 0.14,
 };
 const DARK = {
-  actual: "#f0efec",
+  actual: "#f4f4f4",
   forecast: "#d95926",
   adjusted: "#3987e5",
   band: "#3987e5",
-  grid: "#2a2a28",
-  axis: "#a09e96",
-  surface: "#141413",
+  grid: "#393939",      // Carbon gray-80 gridlines (g100)
+  axis: "#c6c6c6",      // Carbon text-secondary (g100)
+  surface: "#262626",
   bandOpacity: 0.2,   // tuned for the dark page, not inverted: lower glow, still visible
 };
 export type ChartColors = typeof LIGHT;
