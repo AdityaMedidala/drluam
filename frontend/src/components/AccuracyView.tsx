@@ -87,7 +87,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.byLevel} barGap={2} margin={{ top: 24, right: 92, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke={c.grid} vertical={false} />
-                <XAxis dataKey="group" stroke={c.axis} tickLine={false} fontSize={12} />
+                <XAxis dataKey="group" stroke={c.axis} tickLine={false} fontSize={11} interval={0} />
                 <YAxis {...gwAxis(data.byLevel.flatMap((r) => [r.errorBias, r.adjErrorBias]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
                 <ReferenceLine y={0} stroke={c.axis} />
                 <Tooltip cursor={{ fill: c.grid }} content={<GroupTooltip c={c} metric="Bias" />} />
