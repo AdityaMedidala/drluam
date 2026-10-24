@@ -59,11 +59,11 @@ export default function CostPanel({ cutoff, short, long, confidence, onCosts, on
   );
   const match = <Checkmark size={16} className="cost-check" aria-label="matches theory" />;
   const vsNeso = recRow?.vsNesoGBP ?? 0;
-  const title = `Exceedance level by cost${candidates.length ? ` · ${candidates.map((c) => `P${c}`).join(" or ")} recommended` : ""}`;
+  const value = candidates.map((c) => `P${c}`).join(" or ");
   return (
     <section aria-label="Cost-aware exceedance level" className="cost">
       <Accordion size="md" className="cost-accordion">
-        <AccordionItem title={<span className="chart-title">{title}</span>}>
+        <AccordionItem title={<span className="cost-row"><span>Level by cost<span className="cds--visually-hidden">,</span></span><span className="cost-row-value">{value}</span></span>}>
           {error && <ErrorState error={error} />}
           {!data && !error && <Loading height={48} />}
           {rec && bt && (
@@ -115,7 +115,7 @@ export default function CostPanel({ cutoff, short, long, confidence, onCosts, on
           </fieldset>
           {rec && bt && (
             <>
-              <p className="cds--label" id="cost-table-label">Cost (£m, GB-wide volume, illustrative)</p>
+              <p className="cds--label" id="cost-table-label">Cost (£m, GB-wide volume)</p>
               <Table size="xs" className="num-table cost-table" aria-labelledby="cost-table-label">
                 <TableHead>
                   <TableRow>

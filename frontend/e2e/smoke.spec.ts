@@ -107,7 +107,7 @@ test("a mouse click on a header tab leaves no focus ring", async ({ page }) => {
 test("the cost block recommends a level, applies it, and keeps the costs in the URL", async ({ page }) => {
   await page.goto("/?date=2026-01-17&cutoff=09:20&confidence=50");
   const block = page.getByRole("region", { name: "Cost-aware exceedance level" });
-  const header = block.getByRole("button", { name: "Exceedance level by cost · P80 recommended" });
+  const header = block.getByRole("button", { name: /^Level by cost\s*,\s*P80$/ });
   await expect(header).toHaveAttribute("aria-expanded", "false");          // collapsed by default
   await header.click();
   const row = (label: string) => block.locator(".cds--structured-list-row", { hasText: label });
@@ -116,7 +116,14 @@ test("the cost block recommends a level, applies it, and keeps the costs in the 
   await expect(row("11-month backtest").getByRole("img", { name: "matches theory" })).toBeVisible();
   await expect(row("January only")).toContainText("P70, £4.6m less than P80");
   await expect(block).toContainText("P80 would have cost £67.0m less than the NESO forecast in this backtest, at these assumptions.");
-  await expect(block.getByText("Cost (£m, GB-wide volume, illustrative)")).toBeVisible();
+  await expect(block.getByText("Cost (£m, GB-wide volume)")).toBeVisible();
+  await expect(block.getByText("illustrative")).toHaveCount(1);              // said once, on the assumptions
+  // The footnote under the table can be scrolled fully into view inside the panel (not clipped).
+  const foot = block.getByText(/hours at 09:20\. Lowest cost highlighted\./);
+  await foot.scrollIntoViewIfNeeded();
+  const footBox = (await foot.boundingBox())!;
+  const tileBottom = await foot.evaluate((e) => e.closest(".tile")!.getBoundingClientRect().bottom);
+  expect(footBox.y + footBox.height).toBeLessThanOrEqual(tileBottom);
   await expect(block.locator(".cost-table tbody tr")).toHaveCount(7);
   await expect(block.locator(".cost-table tr.lowest")).toHaveCount(1);
   await block.getByRole("link", { name: "Use P80" }).click();
