@@ -217,6 +217,25 @@ def plan(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF, c
     })
 
 
+@app.get("/api/cost")
+def cost(cutoff: str = DEFAULT_CUTOFF,
+         short: float = Query(100, gt=0, le=10_000, description="cost of being short, GBP/MWh"),
+         long: float = Query(30, gt=0, le=10_000, description="cost of being long, GBP/MWh")):
+    """Cost-aware exceedance level: the newsvendor recommendation and a January cost backtest.
+
+    Illustrative: the costs are the desk's assumptions, and nothing here changes the method.
+    """
+    cutoff = normalise_cutoff(cutoff)
+    return clean({
+        "cutoff": cutoff,
+        "short": short,
+        "long": long,
+        "recommended": an.recommended_level(short, long),
+        "backtest": {"period": {"firstDelivery": FIRST_DELIVERY, "lastDelivery": LAST_DELIVERY},
+                     **an.cost_backtest(scoped_frame(cutoff), short, long)},
+    })
+
+
 @app.get("/api/drift")
 def drift(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF):
     if not FIRST_DELIVERY <= date_ <= LAST_DELIVERY:

@@ -239,6 +239,50 @@ def plan_hit_rate(frame: pd.DataFrame, confidence: int) -> dict:
     }
 
 
+# --------------------------------------------------------------------------- cost-aware level
+def recommended_level(short: float, long: float) -> dict:
+    """The exceedance level that minimises expected cost (the newsvendor critical ratio).
+
+    Planning q MWh of wind costs `short` per MWh the outturn falls below q and `long`
+    per MWh it comes in above. Expected cost is lowest where P(outturn >= q) =
+    short / (short + long), i.e. at exceedance level 100 x short / (short + long).
+    `level` is the nearest offered level (ties go to the higher, more cautious one);
+    below P50 it snaps to P50.
+    """
+    if not (short > 0 and long > 0):
+        raise ValueError("short and long costs must both be positive")
+    exact = 100 * short / (short + long)
+    level = min(PLAN_CONFIDENCES, key=lambda c: (abs(c - exact), -c))
+    return {"exact": exact, "level": level, "snapped": exact < 50}
+
+
+def plan_cost(plan: pd.Series, actual: pd.Series, short: float, long: float) -> pd.Series:
+    """Hourly cost (GBP): short x MWh planned but not delivered + long x MWh delivered beyond the plan.
+
+    Hourly MW x 1 h = MWh, on the same hourly outturn alignment as the hit rates.
+    """
+    return short * (plan - actual).clip(lower=0) + long * (actual - plan).clip(lower=0)
+
+
+def cost_backtest(frame: pd.DataFrame, short: float, long: float) -> dict:
+    """Total cost of planning on each level, the NESO forecast and the bias-corrected forecast.
+
+    Every row is scored on the same hours: those with an outturn and every plan level.
+    """
+    plans = {**{f"P{c}": f"plan{c}" for c in PLAN_CONFIDENCES}, "forecast": "forecast", "adjusted": "adjusted"}
+    f = frame.dropna(subset=["actual", *plans.values()])
+    costs = {key: float(plan_cost(f[col], f["actual"], short, long).sum()) for key, col in plans.items()}
+    rows = [{"key": key, "confidence": int(key[1:]) if key.startswith("P") else None,
+             "costGBP": cost, "vsNesoGBP": cost - costs["forecast"]} for key, cost in costs.items()]
+    levels = [r for r in rows if r["confidence"]]
+    return {
+        "hours": int(len(f)),
+        "rows": rows,
+        "lowest": min(rows, key=lambda r: r["costGBP"])["key"],
+        "bestLevel": min(levels, key=lambda r: r["costGBP"])["confidence"],
+    }
+
+
 def error_histogram(error: pd.Series, width: int = 500) -> list[dict]:
     """Bins of `width` MW centred on multiples of `width`, so one bin is centred exactly on zero."""
     e = error.dropna()
