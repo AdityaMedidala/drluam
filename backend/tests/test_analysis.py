@@ -169,3 +169,24 @@ def test_grouped_metrics_compares_raw_and_adjusted_on_the_same_hours():
     # The third hour has no adjusted forecast, so it must not count for raw either.
     assert row["n"] == 2
     assert row["errorBias"] == 100.0 and row["adjErrorBias"] == 50.0
+
+
+def test_dst_spring_forward_day():
+    # Clocks go forward at 01:00 GMT on Sun 29 Mar 2026: that UK day has 23 hours.
+    times = _hourly("2026-03-15T00:00", 17 * 24)
+    forecasts = pd.DataFrame({"publishTime": times - pd.Timedelta(hours=48), "startTime": times, "generation": 200.0})
+    actuals = pd.DataFrame({"startTime": times, "generation": 100.0})
+    frame = build_decision_frame(forecasts, actuals, time(9, 0))
+    by_day = frame.groupby("deliveryDate")
+
+    d29, d30 = pd.Timestamp("2026-03-29").date(), pd.Timestamp("2026-03-30").date()
+    assert by_day.size()[d29] == 23 and by_day.size()[d30] == 24
+    # 09:00 UK on D-1: still GMT on 28 Mar, already BST on 29 Mar.
+    assert by_day["cutoffUtc"].first()[d29] == pd.Timestamp("2026-03-28T09:00Z")
+    assert by_day["cutoffUtc"].first()[d30] == pd.Timestamp("2026-03-29T08:00Z")
+    # The trailing week is measured in real hours, so it is still 168 across the change.
+    assert by_day["historyPoints"].first()[d30] == 168
+    assert by_day["ratio"].first()[d30] == pytest.approx(0.5)
+    # UK delivery day 29 Mar runs 00:00 GMT -> 23:00 UTC.
+    hours = frame[frame.deliveryDate == d29].startTime
+    assert hours.min() == pd.Timestamp("2026-03-29T00:00Z") and hours.max() == pd.Timestamp("2026-03-29T22:00Z")
