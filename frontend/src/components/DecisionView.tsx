@@ -17,6 +17,7 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
 
   useEffect(() => {
     let live = true;
+    setData(null);   // never show the previous day's numbers under a new date or cutoff
     setError(null);
     api.day(date, cutoff).then((d) => live && setData(d)).catch((e) => live && setError(String(e)));
     return () => { live = false; };
@@ -53,7 +54,7 @@ export default function DecisionView({ meta, cutoff }: { meta: Meta; cutoff: str
 
       {error && <ErrorState error={error} />}
       {!data && !error && <Loading />}
-      {data && (
+      {data && !error && (
         <>
           <div className="decision-strip">
             <div>
