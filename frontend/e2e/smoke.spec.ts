@@ -16,11 +16,13 @@ async function seriousViolations(page: Page) {
 test("decision view shows the plan, both charts and no errors", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto("/?date=2026-01-28&confidence=90&cutoff=09:20");
-  await expect(page.getByText("Wind to plan on")).toBeVisible();
+  await expect(page.getByText("P90 planning volume ·")).toBeVisible();
   await expect(page.locator(".hero")).toContainText("180");
-  await expect(page.getByRole("heading", { name: /below raw/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /over 11 runs/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /below NESO forecast/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /across 11 runs/ })).toBeVisible();
   await expect(page.locator(".recharts-surface")).toHaveCount(2);
+  // The menu button exists only below Carbon's large breakpoint.
+  await expect(page.getByRole("button", { name: "Open menu" })).toBeHidden();
   // Both x-axes sit above the fold at 1440x900.
   for (const axis of await page.locator(".recharts-xAxis").all()) {
     const box = await axis.boundingBox();
@@ -33,9 +35,10 @@ test("decision view shows the plan, both charts and no errors", async ({ page })
 test("accuracy view shows the headline numbers and three panels", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto("/?view=accuracy&cutoff=09:20");
-  await expect(page.getByRole("heading", { name: "The forecast ran above actual for most of January" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Forecast exceeded outturn on most January days" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Headline numbers" })).toContainText("84%");
   await expect(page.locator(".three .tile")).toHaveCount(3);
+  await expect(page.getByRole("group", { name: "Headline numbers" })).not.toContainText("~");
   expect(await seriousViolations(page)).toEqual([]);
   expect(errors).toEqual([]);
 });

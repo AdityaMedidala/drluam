@@ -23,39 +23,39 @@ export default function PlanPanel({ plan, day, error, confidence }: {
   const partial = day != null && day.historyPoints < day.historyPointsFull;
 
   if (plan.day.planMWh == null) {
-    return <p className="label">Not enough history before {fmtDate(plan.date)} to build a plan.</p>;
+    return <p className="label">Insufficient history before {fmtDate(plan.date)} for a planning volume.</p>;
   }
   return (
     <section aria-label="Plan">
-      <div className="label">Wind to plan on · {fmtDate(plan.date)}</div>
+      <div className="label">P{confidence} planning volume · {fmtDate(plan.date)}</div>
       <p className="hero">{Math.round(plan.day.planMWh / 1000).toLocaleString("en-GB")}<span className="unit">GWh</span></p>
-      {extra != null && <p className="delta">{fmtGWh0(Math.abs(extra))} {extra >= 0 ? "less" : "more"} than the raw forecast</p>}
+      {extra != null && <p className="delta">{fmtGWh0(Math.abs(extra))} {extra >= 0 ? "below" : "above"} NESO forecast</p>}
       <StructuredListWrapper isCondensed aria-label="Figures behind the plan" className="decision-list">
         <StructuredListBody>
           <StructuredListRow>
-            <StructuredListCell>Raw forecast</StructuredListCell>
+            <StructuredListCell>NESO forecast</StructuredListCell>
             <StructuredListCell>{fmtGWh0(plan.day.rawForecastMWh)}</StructuredListCell>
           </StructuredListRow>
           <StructuredListRow>
-            <StructuredListCell>Expected (adjusted)</StructuredListCell>
+            <StructuredListCell>Bias-corrected forecast</StructuredListCell>
             <StructuredListCell>{fmtGWh0(plan.day.adjustedMWh)}</StructuredListCell>
           </StructuredListRow>
           <StructuredListRow>
             <StructuredListCell>
               <DefinitionTooltip openOnHover align="bottom-left"
                 definition={pooled
-                  ? "Share of hours the actual came in at or above the plan, Nov 2025–Sep 2026 (7,775 hours, same method run offline)."
-                  : "Share of January 2026 hours the actual came in at or above the plan (the longer backtest covers the 09:00/09:20 cutoffs only)."}>
-                Backtest hit rate (P{confidence})
+                  ? "Share of hours with outturn at or above the planning volume, Nov 2025–Sep 2026 backtest (7,775 hours, same method)."
+                  : "Share of January 2026 hours with outturn at or above the planning volume (the longer backtest covers the 09:00/09:20 decision times only)."}>
+                P{confidence} hit rate (backtest)
               </DefinitionTooltip>
             </StructuredListCell>
             <StructuredListCell>{fmtPct(hit)}</StructuredListCell>
           </StructuredListRow>
         </StructuredListBody>
       </StructuredListWrapper>
-      {partial && <p className="warn" role="note">Partial history ({day!.historyPoints} of {day!.historyPointsFull} h): plan rests on less than a week.</p>}
+      {partial && <p className="warn" role="note">Partial history: {day!.historyPoints} of {day!.historyPointsFull} h in the correction window.</p>}
       {day?.forecastPublishedUtc && day.horizonHours && (
-        <p className="run">Forecast run {runTime(day.forecastPublishedUtc)} · {Math.floor(day.horizonHours[0])}–{Math.ceil(day.horizonHours[1])} h ahead</p>
+        <p className="run">NESO forecast run {runTime(day.forecastPublishedUtc)} · {Math.floor(day.horizonHours[0])}–{Math.ceil(day.horizonHours[1])} h ahead</p>
       )}
     </section>
   );

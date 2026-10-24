@@ -8,7 +8,7 @@ export function withUnit(text: ReactNode): ReactNode {
   return m ? <>{m[1]}<span className="unit">{m[2]}</span></> : text;
 }
 
-export const sourceLine = (cutoff: string) => `Elexon WINDFOR/FUELHH · decisions Jan 2026 · ${cutoff} cutoff`;
+export const sourceLine = (cutoff: string) => `Elexon WINDFOR/FUELHH · decisions Jan 2026 · decision time ${cutoff} D-1`;
 
 /** Index of the last row where `key` has a value: where a direct label goes. */
 export function lastIndex(rows: Record<string, unknown>[], key: string): number {

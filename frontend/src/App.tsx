@@ -10,7 +10,7 @@ import AccuracyView from "./components/AccuracyView";
 import DecisionView from "./components/DecisionView";
 import { CONFIDENCES } from "./components/PlanPanel";
 import { ErrorState, Loading } from "./components/ui";
-import { shiftDate } from "./format";
+import { fmtDate, shiftDate } from "./format";
 import { setTheme, useTheme } from "./theme";
 import { readParam, writeParam } from "./url";
 
@@ -22,6 +22,13 @@ type Tab = "decision" | "accuracy";
 
 /** "2026-01-28" -> "28/01/2026", the DatePicker's dateFormat (it takes min/max as strings in that format). */
 const dmy = (iso: string) => iso.split("-").reverse().join("/");
+
+/** "2026-01-28" -> "Wed 28 Jan 2026". */
+const fmtLongDate = (iso: string) => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  const part = (o: Intl.DateTimeFormatOptions) => d.toLocaleDateString("en-GB", { ...o, timeZone: "UTC" });
+  return `${part({ weekday: "short" })} ${part({ day: "numeric" })} ${part({ month: "short" })} ${part({ year: "numeric" })}`;
+};
 
 /** ISO date (YYYY-MM-DD) of a local Date, without a UTC shift. */
 const isoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -70,7 +77,7 @@ export default function App() {
     <Theme theme={theme === "dark" ? "g100" : "g10"} className="app-theme">
       <Header aria-label="Wind Forecast Desk">
         {/* Below Carbon's large breakpoint the header navigation hides; the menu button opens the same items. */}
-        <HeaderMenuButton aria-label={navOpen ? "Close menu" : "Open menu"} isActive={navOpen} isCollapsible
+        <HeaderMenuButton aria-label={navOpen ? "Close menu" : "Open menu"} isActive={navOpen}
           onClick={() => setNavOpen(!navOpen)} />
         <HeaderName href="#" prefix="">Wind Forecast Desk</HeaderName>
         <HeaderNavigation aria-label="Views">{navItems}</HeaderNavigation>
@@ -87,6 +94,11 @@ export default function App() {
 
       {meta && date && (
         <div className="control-bar" role="toolbar" aria-label="View controls">
+          <div className="page-title">
+            {tab === "decision"
+              ? <h1>Day-ahead plan · {fmtLongDate(date)}</h1>
+              : <><h1>Forecast performance · January 2026</h1><p>Delivery days {fmtDate(meta.firstDelivery)} – {fmtDate(meta.lastDelivery)}</p></>}
+          </div>
           {tab === "decision" && (
             <div className="date-group">
               <IconButton kind="ghost" size="md" label="Previous day" disabled={date <= meta.firstDelivery}
@@ -100,21 +112,21 @@ export default function App() {
                 onClick={() => setDate(shiftDate(date, 1))}><ChevronRight /></IconButton>
             </div>
           )}
-          <div style={{ width: 220 }}>
-            <Dropdown id="cutoff" titleText="Decision cutoff (UK, day before)" label="Cutoff" size="md"
+          <div style={{ width: 200 }}>
+            <Dropdown id="cutoff" titleText="Decision time (D-1, UK)" label="Decision time" size="md"
               items={meta.cutoffOptions} itemToString={cutoffLabel} selectedItem={cutoff}
               onChange={({ selectedItem }: { selectedItem: string | null }) => selectedItem && setCutoff(selectedItem)} />
           </div>
           {tab === "decision" && (
             <>
               <div>
-                <div className="cds--label" id="confidence-label">Plan confidence</div>
+                <div className="cds--label" id="confidence-label">Exceedance level</div>
                 <ContentSwitcher size="md" aria-labelledby="confidence-label" selectedIndex={CONFIDENCES.indexOf(confidence)}
                   onChange={({ index }) => index != null && setConfidence(CONFIDENCES[index])}>
                   {CONFIDENCES.map((c) => <Switch key={c} name={String(c)} text={`P${c}`} />)}
                 </ContentSwitcher>
               </div>
-              <Toggle id="show-actual" size="sm" labelText="Show actual" labelA="Off" labelB="On"
+              <Toggle id="show-actual" size="sm" labelText="Show outturn" labelA="" labelB=""
                 toggled={showActual} onToggle={(v: boolean) => setShowActual(v)} />
             </>
           )}

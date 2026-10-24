@@ -45,8 +45,8 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
   return (
     <div>
       <Tile className="tile">
-        <h2>The forecast ran above actual for most of January</h2>
-        <p className="sub">Daily average of the decision-time forecast and metered wind output.</p>
+        <h2 className="chart-title">Forecast exceeded outturn on most January days</h2>
+        <p className="sub">Daily mean, NESO forecast at decision time vs metered outturn.</p>
         <div className="acc-top-plot">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={daily} margin={{ top: 8, right: 104, bottom: 0, left: 0 }}>
@@ -56,16 +56,16 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
               <Tooltip content={({ active, payload }) =>
                 active && payload?.length ? (
                   <ChartTooltip title={payload[0].payload.label} rows={[
-                    { label: "Raw forecast", value: fmtMW(payload[0].payload.forecast), color: c.forecast },
-                    { label: "Actual", value: fmtMW(payload[0].payload.actual), color: c.actual },
+                    { label: "NESO forecast", value: fmtMW(payload[0].payload.forecast), color: c.forecast },
+                    { label: "Outturn", value: fmtMW(payload[0].payload.actual), color: c.actual },
                     { label: "Gap", value: fmtSignedMW(payload[0].payload.forecast - payload[0].payload.actual) },
                   ]} />
                 ) : null} />
               <Area dataKey="gap" stroke="none" fill={c.forecast} fillOpacity={0.15} isAnimationActive={false} />
               <Line dataKey="forecast" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                label={endLabel("Raw forecast", c.forecast, daily.length - 1, -6)} />
+                label={endLabel("NESO forecast", c.forecast, daily.length - 1, -6)} />
               <Line dataKey="actual" stroke={c.actual} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                label={endLabel("Actual", c.actual, daily.length - 1, 10)} />
+                label={endLabel("Outturn", c.actual, daily.length - 1, 10)} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -73,29 +73,29 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
       </Tile>
 
       <div className="figures" role="group" aria-label="Headline numbers">
-        <div><b>~{fmtPct(improvement)}</b><span>error cut by the adjustment</span></div>
-        <div><b>~{fmtPct(biasRemoved)}</b><span>of the bias removed</span></div>
-        <div><b>{fmtPct(p90Pooled ? p90?.developmentHitRate : p90?.januaryHitRate)}</b>
-          <span>plan held at P90 ({p90Pooled ? "Nov 2025–Sep 2026" : "January"})</span></div>
+        <div><b>{fmtPct(improvement)}</b><span>lower MAE after bias correction</span></div>
+        <div><b>{fmtPct(biasRemoved)}</b><span>of mean error removed</span></div>
+        <div><span>P90 held in</span><b>{fmtPct(p90Pooled ? p90?.developmentHitRate : p90?.januaryHitRate)}</b>
+          <span>of hours ({p90Pooled ? "Nov 2025–Sep 2026 backtest" : "January 2026"})</span></div>
       </div>
 
       <div className="three">
         <Tile className="tile">
-          <h3>The windier, the bigger the overshoot</h3>
-          <p className="sub">Mean error by forecast level, raw and adjusted.</p>
+          <h3 className="chart-title">Over-forecast increases with forecast level</h3>
+          <p className="sub">Mean error by forecast level.</p>
           <div className="plot">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.byLevel} barGap={2} margin={{ top: 24, right: 56, bottom: 0, left: 0 }}>
+              <BarChart data={data.byLevel} barGap={2} margin={{ top: 24, right: 92, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke={c.grid} vertical={false} />
                 <XAxis dataKey="group" stroke={c.axis} tickLine={false} fontSize={12} />
                 <YAxis {...gwAxis(data.byLevel.flatMap((r) => [r.errorBias, r.adjErrorBias]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
                 <ReferenceLine y={0} stroke={c.axis} />
                 <Tooltip cursor={{ fill: c.grid }} content={<GroupTooltip c={c} metric="Bias" />} />
                 <Bar dataKey="errorBias" fill={c.forecast} isAnimationActive={false}>
-                  <LabelList content={barLabel("Raw", c.forecast, lastLevel, "end")} />
+                  <LabelList content={barLabel("NESO", c.forecast, lastLevel, "end")} />
                 </Bar>
                 <Bar dataKey="adjErrorBias" fill={c.adjusted} isAnimationActive={false}>
-                  <LabelList content={barLabel("Adjusted", c.adjusted, lastLevel, "start")} />
+                  <LabelList content={barLabel("Bias-corrected", c.adjusted, lastLevel, "start")} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -104,8 +104,8 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
         </Tile>
 
         <Tile className="tile">
-          <h3>Cautious plans held less often than promised</h3>
-          <p className="sub">Share of hours at or above each plan level.</p>
+          <h3 className="chart-title">P90–P95 levels under-cover in backtest</h3>
+          <p className="sub">Hit rate by exceedance level vs target.</p>
           <div className="plot">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={calibration} margin={{ top: 8, right: 72, bottom: 0, left: 0 }}>
@@ -115,13 +115,13 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                 <YAxis type="number" domain={[0.4, 1]} ticks={[0.4, 0.6, 0.8, 1]} tickFormatter={(v) => fmtPct(v)}
                   stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={44} />
                 <ReferenceLine segment={[{ x: 0.4, y: 0.4 }, { x: 1, y: 1 }]} stroke={c.axis} strokeDasharray="4 4" ifOverflow="hidden" />
-                <ReferenceDot x={0.43} y={0.43} r={0} label={{ value: "Promised", position: "right", offset: 8, fill: c.axis, fontSize: 12 }} />
+                <ReferenceDot x={0.43} y={0.43} r={0} label={{ value: "Target", position: "right", offset: 8, fill: c.axis, fontSize: 12 }} />
                 <Tooltip content={({ active, payload }) =>
                   active && payload?.length ? (
-                    <ChartTooltip title={<>P{payload[0].payload.confidence} plan · target {fmtPct(payload[0].payload.target)}</>} rows={[
-                      { label: "Held in January", value: fmtPct(payload[0].payload.januaryHitRate), color: c.adjusted },
+                    <ChartTooltip title={<>P{payload[0].payload.confidence} · target {fmtPct(payload[0].payload.target)}</>} rows={[
+                      { label: "Hit rate, January", value: fmtPct(payload[0].payload.januaryHitRate), color: c.adjusted },
                       ...(payload[0].payload.developmentHitRate != null
-                        ? [{ label: "Held Nov 2025 – Sep 2026", value: fmtPct(payload[0].payload.developmentHitRate), color: c.actual }] : []),
+                        ? [{ label: "Hit rate, Nov 2025 – Sep 2026", value: fmtPct(payload[0].payload.developmentHitRate), color: c.actual }] : []),
                     ]} />
                   ) : null} />
                 <Line dataKey="januaryHitRate" stroke={c.adjusted} strokeWidth={1.5} dot={{ r: 3 }} isAnimationActive={false}
@@ -135,8 +135,8 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
         </Tile>
 
         <Tile className="tile">
-          <h3>Adjusted beat raw on {cmp.daysAdjustedBetter} of {cmp.days} days</h3>
-          <p className="sub">Typical hourly error (MAE) for each delivery day.</p>
+          <h3 className="chart-title">Bias correction reduced MAE on {cmp.daysAdjustedBetter} of {cmp.days} days</h3>
+          <p className="sub">Daily MAE, NESO and bias-corrected forecasts.</p>
           <div className="plot">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={daily} margin={{ top: 8, right: 72, bottom: 0, left: 0 }}>
@@ -146,14 +146,14 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                 <Tooltip content={({ active, payload }) =>
                   active && payload?.length ? (
                     <ChartTooltip title={payload[0].payload.label} rows={[
-                      { label: "Raw MAE", value: fmtMW(payload[0].payload.maeRaw), color: c.forecast },
-                      { label: "Adjusted MAE", value: fmtMW(payload[0].payload.maeAdjusted), color: c.adjusted },
+                      { label: "NESO MAE", value: fmtMW(payload[0].payload.maeRaw), color: c.forecast },
+                      { label: "Bias-corrected MAE", value: fmtMW(payload[0].payload.maeAdjusted), color: c.adjusted },
                     ]} />
                   ) : null} />
                 <Line dataKey="maeRaw" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                  label={endLabel("Raw", c.forecast, lastIndex(daily, "maeRaw"), -6)} />
+                  label={endLabel("NESO", c.forecast, lastIndex(daily, "maeRaw"), -6)} />
                 <Line dataKey="maeAdjusted" stroke={c.adjusted} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                  label={endLabel("Adjusted", c.adjusted, lastIndex(daily, "maeAdjusted"), 12)} />
+                  label={endLabel("Bias-corr.", c.adjusted, lastIndex(daily, "maeAdjusted"), 12)} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -165,8 +165,8 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
         <AccordionItem title="More diagnostics" open={diagOpen} onHeadingClick={({ isOpen }: { isOpen: boolean }) => setDiagOpen(isOpen)}>
           {diagOpen && <div className="stack">
             <section>
-              <h3>The gap persists at every lead time</h3>
-              <p className="sub">All published forecasts; leftmost point is hours already elapsed.</p>
+              <h3 className="chart-title">Over-forecast persists at every lead time</h3>
+              <p className="sub">All published runs; leftmost point: hours already elapsed.</p>
               <div className="diag-plot">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data.byHorizon} margin={{ top: 8, right: 96, bottom: 0, left: 0 }}>
@@ -175,17 +175,17 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                     <YAxis {...gwAxis(data.byHorizon.flatMap((r) => [r.errorMae, r.errorBias]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
                     <Tooltip content={<GroupTooltip c={c} rawOnly />} />
                     <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                      label={endLabel("Typical error", c.forecast, data.byHorizon.length - 1, -6)} />
+                      label={endLabel("MAE", c.forecast, data.byHorizon.length - 1, -6)} />
                     <Line dataKey="errorBias" stroke={c.forecast} strokeWidth={1.5} strokeDasharray="5 4" dot={false} isAnimationActive={false}
-                      label={endLabel("Bias", c.forecast, data.byHorizon.length - 1, 12)} />
+                      label={endLabel("Mean error", c.forecast, data.byHorizon.length - 1, 12)} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
               <p className="source">{source}</p>
             </section>
             <section>
-              <h3>Error varies little by hour of day</h3>
-              <p className="sub">Typical error (MAE) for each delivery hour, UK time.</p>
+              <h3 className="chart-title">MAE is stable across hours of day</h3>
+              <p className="sub">MAE by delivery hour, UK time.</p>
               <div className="diag-plot">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data.byHour} margin={{ top: 8, right: 72, bottom: 0, left: 0 }}>
@@ -194,17 +194,17 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                     <YAxis {...gwAxis(data.byHour.flatMap((r) => [r.errorMae, r.adjErrorMae]))} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
                     <Tooltip content={<GroupTooltip c={c} metric="MAE" hour />} />
                     <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                      label={endLabel("Raw", c.forecast, data.byHour.length - 1, -6)} />
+                      label={endLabel("NESO", c.forecast, data.byHour.length - 1, -6)} />
                     <Line dataKey="adjErrorMae" stroke={c.adjusted} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                      label={endLabel("Adjusted", c.adjusted, data.byHour.length - 1, 12)} />
+                      label={endLabel("Bias-corr.", c.adjusted, data.byHour.length - 1, 12)} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
               <p className="source">{source}</p>
             </section>
             <section>
-              <h3>Most hourly errors were overshoots</h3>
-              <p className="sub">Raw forecast minus actual; right of zero means too high.</p>
+              <h3 className="chart-title">Hourly errors skew to over-forecast</h3>
+              <p className="sub">NESO forecast − outturn; positive = over-forecast.</p>
               <div className="diag-plot">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={hist} barCategoryGap={1} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
@@ -224,7 +224,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
               <p className="source">{source}</p>
             </section>
             <Table size="sm" aria-label="Plan calibration">
-              <TableHead><TableRow><TableHeader>Plan level</TableHeader><TableHeader>Target</TableHeader><TableHeader>Held, January</TableHeader><TableHeader>Held, Nov 2025 – Sep 2026</TableHeader></TableRow></TableHead>
+              <TableHead><TableRow><TableHeader>Exceedance level</TableHeader><TableHeader>Target</TableHeader><TableHeader>Hit rate, January</TableHeader><TableHeader>Hit rate, Nov 2025 – Sep 2026</TableHeader></TableRow></TableHead>
               <TableBody>
                 {calibration.map((r) => (
                   <TableRow key={r.confidence}>
@@ -237,16 +237,28 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
           </div>}
         </AccordionItem>
         <AccordionItem title="Methodology">
-          <ul className="methodology">
-            <li><strong>Period:</strong> decisions made in January 2026, i.e. delivery days {fmtDate(data.period.firstDelivery)} – {fmtDate(data.period.lastDelivery)}, hourly, unless a figure says Nov 2025 – Sep 2026. Adjusted and raw are compared on the same {cmp.adjusted.n} hours; raw-only figures use all {raw.n}. The top chart shows daily averages.</li>
-            <li><strong>Forecast used:</strong> for each delivery hour, the latest Elexon WINDFOR forecast published at or before the decision cutoff ({data.cutoff} UK the day before). <strong>Actual:</strong> Elexon FUELHH wind generation for the same hour.</li>
-            <li><strong>Error</strong> = forecast − actual; positive means the forecast was too high, the risk of buying too little. On average the forecast ran {fmtSignedMW(raw.bias)} high and was too high in {fmtPct(raw.overForecastShare)} of hours. <strong>Typical error (MAE):</strong> the average of |error|.</li>
-            <li><strong>Adjusted forecast:</strong> raw forecast × (actual ÷ forecast) over the previous 7 days, using only actuals already known at the cutoff. <strong>Error cut:</strong> 1 − adjusted MAE ÷ raw MAE. <strong>Bias removed:</strong> 1 − adjusted bias ÷ raw bias.</li>
-            <li><strong>Plan held:</strong> the share of hours the actual came in at or above a plan level (target = the level). The Nov 2025 – Sep 2026 figures come from the same method run offline on those months (7,775 hours) and are shown at the 09:00/09:20 cutoffs only.</li>
-            <li><strong>Range (P10–P90):</strong> the adjusted forecast + the 10th–90th percentile of the last 7 days' misses; it held the actual in {fmtPct(band.coverage)} of {band.n} hours, against 80% nominal.</li>
-            <li>Most of the average gap matches wind curtailment (accepted bids) — see docs/curtailment-check.md; that analysis uses data outside this app.</li>
-            <li>All figures are measured on past data. They describe how the method did, not a guarantee of how it will do.</li>
-          </ul>
+          <dl className="methodology">
+            <dt>Period</dt>
+            <dd>Decisions made in January 2026: delivery days {fmtDate(data.period.firstDelivery)} – {fmtDate(data.period.lastDelivery)}, hourly, unless a figure states Nov 2025 – Sep 2026. NESO and bias-corrected forecasts are compared on the same {cmp.adjusted.n} hours; NESO-only figures use all {raw.n}. The top chart shows daily means.</dd>
+            <dt>NESO forecast</dt>
+            <dd>For each delivery hour, the latest WINDFOR forecast (Elexon BMRS) published at or before the decision time ({data.cutoff} UK on D-1).</dd>
+            <dt>Outturn</dt>
+            <dd>FUELHH metered wind generation for the same hour.</dd>
+            <dt>Error and mean error</dt>
+            <dd>Error = forecast − outturn; positive = over-forecast, the risk of under-buying. Mean error (bias) of the NESO forecast: {fmtSignedMW(raw.bias)}; over-forecast in {fmtPct(raw.overForecastShare)} of hours.</dd>
+            <dt>MAE</dt>
+            <dd>Mean absolute error: the average of |error| over the period, in MW.</dd>
+            <dt>Bias-corrected forecast</dt>
+            <dd>NESO forecast × (outturn ÷ forecast) over the previous 7 days, using only outturn known at decision time. Lower MAE = 1 − bias-corrected MAE ÷ NESO MAE. Mean error removed = 1 − bias-corrected mean error ÷ NESO mean error.</dd>
+            <dt>Hit rate (backtest)</dt>
+            <dd>Share of hours with outturn at or above the planning volume at an exceedance level (target = the level). Nov 2025 – Sep 2026 figures use the same method offline (7,775 hours) and are shown for the 09:00/09:20 decision times only.</dd>
+            <dt>P10–P90 range</dt>
+            <dd>Bias-corrected forecast + the 10th–90th percentile of the previous 7 days' errors; it held outturn in {fmtPct(band.coverage)} of {band.n} hours, against 80% nominal.</dd>
+            <dt>Curtailment</dt>
+            <dd>Most of the average gap matches wind curtailment (accepted bids) — see docs/curtailment-check.md; that analysis uses data outside this app.</dd>
+            <dt>Caveat</dt>
+            <dd>All figures are measured on past data: past performance, not a guarantee.</dd>
+          </dl>
         </AccordionItem>
       </Accordion>
     </div>
@@ -259,10 +271,10 @@ function GroupTooltip({ active, payload, metric, rawOnly, hour, c }: any & { c: 
   const p = payload[0].payload;
   const title = hour ? `${String(p.group).padStart(2, "0")}:00 UK` : p.group;
   const rows = rawOnly
-    ? [{ label: "Typical error", value: fmtMW(p.errorMae), color: c.forecast }, { label: "Bias", value: fmtSignedMW(p.errorBias), color: c.forecast }]
+    ? [{ label: "MAE", value: fmtMW(p.errorMae), color: c.forecast }, { label: "Mean error", value: fmtSignedMW(p.errorBias), color: c.forecast }]
     : metric === "Bias"
-      ? [{ label: "Raw bias", value: fmtSignedMW(p.errorBias), color: c.forecast }, { label: "Adjusted bias", value: fmtSignedMW(p.adjErrorBias), color: c.adjusted }]
-      : [{ label: "Raw MAE", value: fmtMW(p.errorMae), color: c.forecast }, { label: "Adjusted MAE", value: fmtMW(p.adjErrorMae), color: c.adjusted }];
+      ? [{ label: "NESO mean error", value: fmtSignedMW(p.errorBias), color: c.forecast }, { label: "Bias-corrected mean error", value: fmtSignedMW(p.adjErrorBias), color: c.adjusted }]
+      : [{ label: "NESO MAE", value: fmtMW(p.errorMae), color: c.forecast }, { label: "Bias-corrected MAE", value: fmtMW(p.adjErrorMae), color: c.adjusted }];
   return <ChartTooltip title={title} rows={[...rows, { label: "Hours", value: p.n }]} />;
 }
 

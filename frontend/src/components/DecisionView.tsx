@@ -68,8 +68,8 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
   const ratio = data?.correctionRatio ?? null;
   const coverage = data?.bandCoverage != null ? fmtPct(data.bandCoverage) : "–";
   const title = !data ? "" : ratio == null
-    ? "Raw forecast only: not enough history to adjust"
-    : `Adjusted forecast sits ${fmtPct(Math.abs(1 - ratio))} ${ratio < 1 ? "below" : "above"} raw`;
+    ? "NESO forecast only: insufficient history for bias correction"
+    : `Bias-corrected forecast ${fmtPct(Math.abs(1 - ratio))} ${ratio < 1 ? "below" : "above"} NESO forecast`;
 
   return (
     <>
@@ -84,14 +84,14 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
           {!data && !error && <Loading height={480} />}
           {data && !error && (
             <>
-              <h2>{title}</h2>
+              <h2 className="chart-title">{title}</h2>
               <p className="sub">
-                {showActual ? <>In hindsight, {fmtGWh(data.summary.actualEnergyMWh)} of wind came in.</>
-                  : hasCorrection ? <>Shaded range held the actual in {coverage} of January hours.</> : null}
+                {showActual ? <>Outturn: {fmtGWh(data.summary.actualEnergyMWh)}.</>
+                  : hasCorrection ? <>P10–P90 range held outturn in {coverage} of January hours.</> : null}
               </p>
               <div className="main-plot">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 8, right: 112, bottom: 0, left: 0 }}>
+                  <ComposedChart data={chartData} margin={{ top: 8, right: 150, bottom: 0, left: 0 }}>
                     <CartesianGrid stroke={c.grid} vertical={false} />
                     <XAxis dataKey="time" tickFormatter={fmtTime} ticks={sixHourTicks} stroke={c.axis} tickLine={false} fontSize={12} />
                     <YAxis {...yAxis} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
@@ -100,13 +100,13 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
                     {hasCorrection && <Line dataKey="low" stroke="none" dot={false} connectNulls isAnimationActive={false} legendType="none"
                       label={endLabel("P10–P90 range", c.adjusted, lastIndex(chartData, "low"), 16)} />}
                     <Line dataKey="forecast" stroke={c.forecast} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false}
-                      label={endLabel("Raw forecast", c.forecast, lastIndex(chartData, "forecast"), -4)} />
+                      label={endLabel("NESO forecast", c.forecast, lastIndex(chartData, "forecast"), -4)} />
                     {hasCorrection && <Line dataKey="adjusted" stroke={c.adjusted} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false}
-                      label={endLabel("Adjusted", c.adjusted, lastIndex(chartData, "adjusted"), 8)} />}
+                      label={endLabel("Bias-corrected", c.adjusted, lastIndex(chartData, "adjusted"), 8)} />}
                     <Line dataKey="plan" stroke={c.actual} strokeWidth={2} strokeDasharray="6 4" dot={false} connectNulls isAnimationActive={false}
-                      label={endLabel(`Plan (P${confidence})`, c.actual, lastIndex(chartData, "plan"), 0)} />
+                      label={endLabel(`P${confidence} planning volume`, c.actual, lastIndex(chartData, "plan"), 0)} />
                     {showActual && <Line dataKey="actual" stroke={c.actual} strokeWidth={1.5} dot={false} isAnimationActive={false}
-                      label={endLabel("Actual", c.actual, lastIndex(chartData, "actual"))} />}
+                      label={endLabel("Outturn", c.actual, lastIndex(chartData, "actual"))} />}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -121,9 +121,9 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
           {data && (
             <Table size="sm" aria-label="Hourly forecast for the delivery day">
               <TableHead><TableRow>
-                <TableHeader>Time (UK)</TableHeader><TableHeader>Raw forecast</TableHeader><TableHeader>Adjusted</TableHeader>
-                <TableHeader>Plan (P{confidence})</TableHeader><TableHeader>P10</TableHeader><TableHeader>P90</TableHeader>
-                {showActual && <TableHeader>Actual</TableHeader>}
+                <TableHeader>Time (UK)</TableHeader><TableHeader>NESO forecast</TableHeader><TableHeader>Bias-corrected</TableHeader>
+                <TableHeader>P{confidence} planning volume</TableHeader><TableHeader>P10</TableHeader><TableHeader>P90</TableHeader>
+                {showActual && <TableHeader>Outturn</TableHeader>}
               </TableRow></TableHead>
               <TableBody>
                 {chartData.filter((p) => p.forecast != null).map((p) => (
@@ -154,17 +154,26 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
           )}
         </AccordionItem>
         <AccordionItem title="Methodology">
-          <ul className="methodology">
-            <li><strong>Raw forecast:</strong> for each hour, the latest Elexon WINDFOR forecast published at or before the decision cutoff ({cutoff} UK the day before). Later forecasts are ignored: the desk couldn't have seen them in time.</li>
-            <li><strong>Expected (adjusted):</strong> raw forecast × the ratio of actual to forecast wind over the previous 7 days, using only actuals already known at the cutoff{ratio != null ? <> (for this day: {ratio.toFixed(2)})</> : null}.</li>
-            <li><strong>Plan on P{confidence}:</strong> each hour's adjusted forecast + the {100 - confidence}th percentile of the last 7 days' hourly misses (actual − adjusted, positive or negative), never below 0, summed over the day. At P90 the plan is the bottom edge of the P10–P90 range. The difference from the raw forecast is raw − plan.</li>
-            <li><strong>Backtest hit rate:</strong> the share of past hours whose actual came in at or above the plan. Nov 2025 – Sep 2026 (7,775 hours) comes from the same method run offline on those months and is shown at the 09:00/09:20 cutoffs only; January 2026 is this app's data. The cautious plans over-promise: P90 was missed in 16% of hours (promised 10%), P95 in 11% (promised 5%), because whole-day shortfalls are more frequent than the previous week's errors suggest. Past results, not a guarantee.</li>
-            <li><strong>Range:</strong> the adjusted forecast + the 10th–90th percentile of the same misses.</li>
-            <li><strong>Forecast drift:</strong> every WINDFOR run published up to the cutoff for this day's hours; runs are compared on the hours they all cover, because runs two days ahead stop short of the last hours. Both charts share one y-axis.</li>
-            <li><strong>Show actual:</strong> FUELHH metered wind output, half-hourly, hidden by default so the view shows only what was known at decision time.</li>
-            <li>Most of the average gap matches wind curtailment (accepted bids) — see docs/curtailment-check.md; that analysis uses data outside this app.</li>
-            <li>Times are UK local time. Energy totals: hourly MW × 1 h (forecasts), half-hourly MW × 0.5 h (actuals).</li>
-          </ul>
+          <dl className="methodology">
+            <dt>NESO forecast</dt>
+            <dd>For each hour, the latest WINDFOR forecast (Elexon BMRS) published at or before the decision time ({cutoff} UK on D-1). Later runs are excluded: they were not available at decision time.</dd>
+            <dt>Bias-corrected forecast</dt>
+            <dd>NESO forecast × the ratio of outturn to forecast over the previous 7 days, using only outturn known at decision time{ratio != null ? <> (this day: {ratio.toFixed(2)})</> : null}.</dd>
+            <dt>P{confidence} planning volume</dt>
+            <dd>Each hour's bias-corrected forecast + the {100 - confidence}th percentile of the previous 7 days' hourly errors (outturn − bias-corrected, either sign), floored at 0, summed over the day. At P90 it equals the lower edge of the P10–P90 range. Difference from the NESO forecast = NESO forecast − planning volume.</dd>
+            <dt>Hit rate (backtest)</dt>
+            <dd>Share of hours with outturn at or above the planning volume. Nov 2025 – Sep 2026 (7,775 hours) uses the same method offline and is shown for the 09:00/09:20 decision times only; January 2026 uses this app's data. P90 missed in 16% of hours (target 10%), P95 in 11% (target 5%): whole-day shortfalls occur more often than the previous week's errors imply. Past performance, not a guarantee.</dd>
+            <dt>P10–P90 range</dt>
+            <dd>Bias-corrected forecast + the 10th–90th percentile of the same hourly errors.</dd>
+            <dt>Forecast revisions</dt>
+            <dd>Every WINDFOR run published up to the decision time for this day's hours, compared on the hours all runs cover (D-2 runs end before the last hours). Both charts share one y-axis.</dd>
+            <dt>Outturn</dt>
+            <dd>FUELHH metered wind generation, half-hourly. Hidden by default so the view shows only information available at decision time.</dd>
+            <dt>Curtailment</dt>
+            <dd>Most of the average gap matches wind curtailment (accepted bids) — see docs/curtailment-check.md; that analysis uses data outside this app.</dd>
+            <dt>Units and times</dt>
+            <dd>UK local time. Energy: hourly MW × 1 h (forecasts), half-hourly MW × 0.5 h (outturn).</dd>
+          </dl>
         </AccordionItem>
       </Accordion>
     </>
@@ -176,11 +185,11 @@ function DayTooltip({ active, payload, showActual, confidence, c }: any) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   const rows = [
-    p.forecast != null && { label: "Raw forecast", value: fmtMW(p.forecast), color: c.forecast },
-    p.adjusted != null && { label: "Adjusted", value: fmtMW(p.adjusted), color: c.adjusted },
-    p.plan != null && { label: `Plan (P${confidence})`, value: fmtMW(p.plan), color: c.actual },
+    p.forecast != null && { label: "NESO forecast", value: fmtMW(p.forecast), color: c.forecast },
+    p.adjusted != null && { label: "Bias-corrected", value: fmtMW(p.adjusted), color: c.adjusted },
+    p.plan != null && { label: `P${confidence} planning volume`, value: fmtMW(p.plan), color: c.actual },
     p.low != null && { label: "P10–P90", value: `${fmtMW(p.low)} – ${fmtMW(p.high)}`, color: c.band },
-    showActual && p.actual != null && { label: "Actual", value: fmtMW(p.actual), color: c.actual },
+    showActual && p.actual != null && { label: "Outturn", value: fmtMW(p.actual), color: c.actual },
   ].filter(Boolean);
   return <ChartTooltip title={`${fmtTime(p.time)} UK`} rows={rows} />;
 }

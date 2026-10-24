@@ -26,20 +26,19 @@ export default function DriftPanel({ drift, error, c, yAxis }: {
 
   if (error) return <div className="drift"><ErrorState error={error} /></div>;
   if (!drift) return <div className="drift"><Loading height={150} /></div>;
-  if (runs.length === 0) return <div className="drift"><p className="label">No forecast runs before the cutoff for this day.</p></div>;
+  if (runs.length === 0) return <div className="drift"><p className="label">No forecast runs before the decision time for this day.</p></div>;
 
   const last = runs.length - 1;
-  const first = Math.round(runs[0].commonMWh / 1000);
-  const decision = Math.round(runs[last].commonMWh / 1000);
-  const verb = decision < first ? "fell" : decision > first ? "rose" : "held at";
+  const change = Math.round((runs[last].commonMWh - runs[0].commonMWh) / 1000);   // GWh, on the common hours
 
   return (
     <section className="drift" aria-label="Forecast drift">
-      <h3>Forecast {verb} {first === decision ? `${first}` : `${first} → ${decision}`} GWh over {runs.length} runs</h3>
-      <p className="sub">On the {drift.commonHours} hours every run covers.</p>
+      <h3 className="chart-title">{change === 0 ? `Forecast unchanged across ${runs.length} runs`
+        : `Forecast revised ${change < 0 ? "down" : "up"} ${Math.abs(change)} GWh across ${runs.length} runs`}</h3>
+      <p className="sub">Common hours: {drift.commonHours} of {runs[last].hours.length}.</p>
       <div className="drift-plot">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={rows} margin={{ top: 6, right: 64, bottom: 0, left: 0 }}>
+          <LineChart data={rows} margin={{ top: 6, right: 84, bottom: 0, left: 0 }}>
             <CartesianGrid stroke={c.grid} vertical={false} />
             <XAxis dataKey="time" tickFormatter={fmtTime} ticks={ticks} stroke={c.axis} tickLine={false} fontSize={12} />
             <YAxis {...yAxis} stroke={c.axis} tickLine={false} axisLine={false} fontSize={12} width={52} />
@@ -55,13 +54,13 @@ export default function DriftPanel({ drift, error, c, yAxis }: {
                 stroke={r.isDecisionRun ? c.forecast : c.axis}
                 strokeWidth={r.isDecisionRun ? 2 : 1}
                 strokeOpacity={r.isDecisionRun ? 1 : 0.2 + 0.45 * (i / Math.max(1, last))}
-                label={i === 0 ? endLabel("First", c.axis, lastIndex(rows, "r0"), -6)
-                  : r.isDecisionRun ? endLabel("Decision", c.forecast, lastIndex(rows, `r${i}`), 8) : undefined} />
+                label={i === 0 ? endLabel("First run", c.axis, lastIndex(rows, "r0"), -6)
+                  : r.isDecisionRun ? endLabel("Decision run", c.forecast, lastIndex(rows, `r${i}`), 8) : undefined} />
             ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <p className="source">Elexon WINDFOR · runs up to the {drift.cutoff} cutoff</p>
+      <p className="source">Elexon WINDFOR · runs published by {drift.cutoff} D-1</p>
     </section>
   );
 }
