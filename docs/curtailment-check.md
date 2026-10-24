@@ -23,7 +23,7 @@ FUELHH WIND is metered output, so it is net of any bids the system operator acce
 | Raw forecast vs FUELHH actual (the app) | +1,746 MW | 2,022 MW | 85% |
 | Raw forecast vs actual + accepted wind bids | +221 MW | 1,147 MW | 55% |
 
-Accepted wind bids were non-zero in 73% of hours. Day by day, the mean gap and the mean accepted bids are correlated at 0.69 (Pearson) and 0.68 (Spearman).
+Accepted wind bids were non-zero in 73% of hours. The 87% is a share of the average gap; hour by hour the absolute error falls 43% (MAE 2,022 → 1,147 MW). Day by day, the mean gap and the mean accepted bids are correlated at 0.69 (Pearson) and 0.68 (Spearman).
 
 ### By forecast level
 

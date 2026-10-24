@@ -23,7 +23,7 @@ A web app for a UK utility's day-ahead power buying team. It answers two questio
 
 - The forecast available at decision time was **too high in 85% of hours**, by +1,746 MW on average. A desk buying against it would have consistently under-bought.
 - **The correction removes ~82% of the bias and cuts typical error by ~32%; it beat the raw forecast on 22 of 31 days.**
-- The over-forecast appears at **every lead time, about 1.5–2 GW, even for hours that had already happened** when the forecast was published (+1.7 GW). So it is mostly not forecasting skill. It is a systematic gap between what WINDFOR forecasts and what FUELHH reports as generated. The likely cause is curtailment: an outside check with Elexon's accepted bid volumes for wind farms (docs/curtailment-check.md) finds wind was turned down by 1.5 GW on average in January, 87% of the gap. That data is outside the brief, so the app doesn't use it.
+- The over-forecast appears at **every lead time, about 1.5–2 GW, even for hours that had already happened** when the forecast was published (+1.7 GW). So it is mostly not forecasting skill. It is a systematic gap between what WINDFOR forecasts and what FUELHH reports as generated. The likely cause is curtailment: an outside check with Elexon's accepted bid volumes for wind farms (docs/curtailment-check.md) finds wind was turned down by 1.5 GW on average in January, about 87% of the average gap (hour by hour the error falls 43%). That data is outside the brief, so the app doesn't use it.
 - The gap grows with wind level: about +2.7 GW when the forecast is above 15 GW (still about +1.0 GW after the correction).
 - **The uncertainty band under-covers: the actual fell inside it in 69% of hours, against an 80% target.** See *Limitations*.
 
@@ -169,7 +169,7 @@ Outside the app; each analysis runs the app's own logic unchanged on other month
 - Add other renewables and demand forecasts, so the app shows the actual residual volume to buy.
 - Recalibrate the "plan on" levels so a P90 plan holds about 90% of hours (today about 84%, `docs/plan-backtest.md`). This is a method change: it must be pre-registered and confirmed on Nov 2026+ data, because every earlier month has been used, so the app shows the measured hit rates instead.
 - A better-calibrated band. Three reshaped bands failed (docs/uncertainty.md); the most promising lead, a 14-day residual window, is pre-registered for confirmation on Nov 2026+ data (docs/method-candidates.md).
-- Forecast curtailment directly. Accepted wind bids explain 87% of January's gap (docs/curtailment-check.md), so a constraint or curtailment forecast is the most promising input for whole-day level errors. A simple level-banded ratio failed its test (docs/correction.md).
+- Forecast curtailment directly. Accepted wind bids account for about 87% of January's average gap (docs/curtailment-check.md), so a constraint or curtailment forecast is the most promising input for whole-day level errors. A simple level-banded ratio failed its test (docs/correction.md).
 - Schedule automatic data refreshes.
 
 ## Use of AI tools
