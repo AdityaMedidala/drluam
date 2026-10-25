@@ -28,7 +28,7 @@ smoke:  ## smoke-test a deployment: make smoke URL=https://drluam.vercel.app
 	@test -n "$(URL)" || { echo "usage: make smoke URL=https://..."; exit 2; }
 	bash scripts/smoke_test.sh $(URL)
 
-reproduce:  ## fetch every period from Elexon, rerun every study, check every documented number; pass/fail table
+reproduce:  ## fetch every period from Elexon, rerun every study, check the documented numbers; pass/fail table
 	$(PY) analysis/reproduce.py
 
 reproduce-app:  ## fast check: fetch the app snapshot, check the README headline numbers on it, run the backend tests

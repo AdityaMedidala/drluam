@@ -130,10 +130,13 @@ flowchart LR
 1. It fetches every period the docs use, plus the curtailment and NESO inputs, and compares each file's sha256 with its committed manifest. A file Elexon has since revised is reported by name as REVISED, and the checks run on the fetched data.
 2. It reruns every study.
 3. It runs the three pre-registered confirmations (vault, October 2026, 2024) in a **verify mode**. That recomputes them and compares with the recorded results, so it is not a new confirmation run.
-4. It checks every number each study prints against its doc, plus a registry of prose claims in the README and the ADR.
+4. It checks the numbers in three ways:
+   - every table row a study prints is matched number by number, and in order, against its doc;
+   - each number on a study's prose lines must appear in the doc (a presence check, not a position check);
+   - a registry of key prose claims in the README, the ADR and the study docs is matched against the reproduced output.
 5. It runs the backend and analysis tests, then prints a pass/fail table.
 
-A changed file is reported by name. **EXTENDED** means Elexon only added rows past the recorded range, for example a day that has finished since; the checks then use the recorded rows. **REVISED** means recorded values changed; the checks run on the fetched copy and the original is restored afterwards. Measured on a 10-core laptop on 25 Oct 2026, the full run took 39 min wall-clock: about 12 min of Elexon downloads and 9 min of studies and tests. It reported `analysis/data-2026-10/actuals_wind.csv` as extended (24 Oct had finished since the fetch), and every other file was identical. `--skip-fetch` runs the same checks on the local data in about 9 min. Determinism comes from the pinned versions in `analysis/requirements.txt`, with LightGBM run with `deterministic=True`, fixed seeds and row-wise training.
+A changed file is reported by name. **EXTENDED** means Elexon only added rows past the recorded range, for example a day that has finished since; the checks then use the recorded rows. **REVISED** means recorded values changed; the checks run on the fetched copy and the original is restored afterwards. Measured on a 10-core laptop on 25 Oct 2026, the full run took 39 min wall-clock. The script's own timers account for 21 min of that: about 12 min of Elexon downloads and 9 min of studies and tests. The other 18 min are not attributed; the laptop was unattended, so it may have slept. It reported `analysis/data-2026-10/actuals_wind.csv` as extended (24 Oct had finished since the fetch), and every other file was identical. `--skip-fetch` runs the same checks on the local data in about 9 min. Determinism comes from the pinned versions in `analysis/requirements.txt`, with LightGBM run with `deterministic=True`, fixed seeds and row-wise training.
 
 ### With Docker (recommended)
 
