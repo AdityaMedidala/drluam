@@ -81,7 +81,7 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
     ...(hasCorrection ? [{ label: adj, color: c.adjusted }] : []),
     { label: `P${confidence} planning volume`, color: c.plan, kind: "dash" as const },
     ...(hasCorrection ? [{ label: "80% range", color: c.band, kind: "band" as const }] : []),
-    ...(hasCorrection && model === "ml" ? [{ label: "80% range low edge", color: c.adjusted }] : []),
+    ...(hasCorrection && model === "ml" ? [{ label: "80% range low edge", color: c.axis }] : []),
     ...(showActual ? [{ label: "Outturn", color: c.actual }] : []),
   ];
   const hourly = chartData.filter((p) => p.forecast != null);
@@ -125,7 +125,7 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
                   <Line dataKey="forecast" stroke={c.forecast} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
                   {hasCorrection && <Line dataKey="adjusted" stroke={c.adjusted} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />}
                   {/* ML: the range's low edge as a thin line, under the dashed planning volume (they differ under ML) */}
-                  {hasCorrection && model === "ml" && <Line dataKey="low" stroke={c.adjusted} strokeWidth={1} strokeOpacity={0.6} dot={false} connectNulls isAnimationActive={false} />}
+                  {hasCorrection && model === "ml" && <Line dataKey="low" stroke={c.axis} strokeWidth={1} dot={false} connectNulls isAnimationActive={false} />}
                   <Line dataKey="plan" stroke={c.plan} strokeWidth={2} strokeDasharray="6 4" dot={false} connectNulls isAnimationActive={false} />
                   {showActual && <Line dataKey="actual" stroke={c.actual} strokeWidth={1.5} dot={false} isAnimationActive={false} />}
                 </ComposedChart>
