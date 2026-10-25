@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.main import app, scoped_frame
 
 README = (Path(__file__).resolve().parents[2] / "README.md").read_text()
 
@@ -29,6 +29,11 @@ def acc():
     return body
 
 
+def nmae(col):
+    f = scoped_frame("09:20").dropna(subset=["actual", "adjusted"])
+    return f[col].abs().mean() / f["actual"].mean()
+
+
 def headline(acc):
     raw, adj = acc["comparison"]["raw"], acc["comparison"]["adjusted"]
     return {
@@ -38,8 +43,9 @@ def headline(acc):
         "raw bias": mw(raw["bias"]),
         "adjusted bias": mw(adj["bias"]),
         "bias removed": f"~{1 - adj['bias'] / raw['bias']:.0%} removed",
-        "raw nMAE": f"{raw['nmae']:.1%}",
-        "adjusted nMAE": f"{adj['nmae']:.1%}",
+        # nMAE from the unrounded hours: the API's 4-dp rounding (0.1225) would round twice to 12.2%.
+        "raw nMAE": f"{nmae('error'):.1%}",
+        "adjusted nMAE": f"{nmae('adjError'):.1%}",
         "hours over-forecast": f"too high in {pct(acc['raw']['overForecastShare'])} of hours",
         "hours compared": f"same {adj['n']} hours ({acc['comparison']['days']} delivery days",
         "days beaten": f"beat the raw forecast on {acc['comparison']['daysAdjustedBetter']} of {acc['comparison']['days']} days",
@@ -55,7 +61,7 @@ GOLDEN = {
     "adjusted bias": "+320 MW",
     "bias removed": "~82% removed",
     "raw nMAE": "17.9%",
-    "adjusted nMAE": "12.2%",
+    "adjusted nMAE": "12.3%",
     "hours over-forecast": "too high in 85% of hours",
     "hours compared": "same 744 hours (31 delivery days",
     "days beaten": "beat the raw forecast on 22 of 31 days",

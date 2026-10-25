@@ -25,7 +25,7 @@ On an unseen year, 2024, ML's 80% range covered 80.0% of hours, and its pinball 
 |---|---|---|
 | Typical hourly error (MAE) | 2,022 MW | 1,383 MW (−32%) |
 | Average bias (forecast − actual) | +1,746 MW | +320 MW (~82% removed) |
-| Error as share of output | 17.9% | 12.2% |
+| Error as share of output | 17.9% | 12.3% |
 | Hours over-forecast | 85% | 55% |
 
 *Raw and adjusted are compared on the same 744 hours (31 delivery days, each with a full week of history).*
