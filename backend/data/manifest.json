@@ -33,5 +33,19 @@
     ],
     "publishTimes": 384,
     "rows": 28032
+  },
+  "mlPredictions": {
+    "file": "ml_predictions.csv",
+    "sha256": "32a2b9c1fdbe323f1a5e85a2e3e7926637fef497d2318226a79aef1f04abc3f9",
+    "rows": 1431,
+    "scoredRows": 744,
+    "recipe": "LightGBM + CQR, frozen recipe of docs/cqr.md (analysis/ml_challenger.py, analysis/cqr.py); ADR-001",
+    "generatedBy": "make ml (analysis/ml_export.py)"
+  },
+  "mlDevelopment": {
+    "file": "ml_development.json",
+    "sha256": "02bb1ae8682a004fba6bd85b4bbda12d1564c0d20699d40c15aa094e0966122b",
+    "recipe": "LightGBM + CQR, frozen recipe of docs/cqr.md (analysis/ml_challenger.py, analysis/cqr.py); ADR-001",
+    "generatedBy": "make ml (analysis/ml_export.py)"
   }
 }
