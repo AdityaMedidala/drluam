@@ -83,7 +83,7 @@ test("each chart's toolbar shows its own data table", async ({ page }) => {
 test("with no URL parameters the app opens on the representative day, 17 Jan", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("#delivery-day")).toHaveValue("17/01/2026");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Day-ahead plan · Sat 17 Jan 2026");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Day-ahead plan");
 });
 
 test("the Methodology hit-rate line follows the decision time, like the plan panel", async ({ page }) => {
@@ -183,4 +183,14 @@ test("an ML link at a decision time ML doesn't cover opens on Simple", async ({ 
   await expect(page).toHaveURL(/model=simple/);
   await page.locator("#model").click();
   await expect(page.getByRole("option", { name: "ML (LightGBM + CQR)" })).toHaveAttribute("aria-disabled", "true");
+});
+
+test("the page title is never truncated on desktop widths", async ({ page }) => {
+  for (const width of [1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/?date=2026-01-17&model=ml");
+    const h1 = page.getByRole("heading", { level: 1 });
+    await expect(h1).toHaveText("Day-ahead plan");
+    expect(await h1.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  }
 });

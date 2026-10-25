@@ -26,13 +26,6 @@ type Tab = "decision" | "accuracy";
 /** "2026-01-28" -> "28/01/2026", the DatePicker's dateFormat (it takes min/max as strings in that format). */
 const dmy = (iso: string) => iso.split("-").reverse().join("/");
 
-/** "2026-01-28" -> "Wed 28 Jan 2026". */
-const fmtLongDate = (iso: string) => {
-  const d = new Date(`${iso}T12:00:00Z`);
-  const part = (o: Intl.DateTimeFormatOptions) => d.toLocaleDateString("en-GB", { ...o, timeZone: "UTC" });
-  return `${part({ weekday: "short" })} ${part({ day: "numeric" })} ${part({ month: "short" })} ${part({ year: "numeric" })}`;
-};
-
 /** ISO date (YYYY-MM-DD) of a local Date, without a UTC shift. */
 const isoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -114,7 +107,7 @@ export default function App() {
         <section className="control-bar" aria-label="View controls">
           <div className="page-title">
             {tab === "decision"
-              ? <h1>Day-ahead plan · {fmtLongDate(date)}</h1>
+              ? <h1>Day-ahead plan</h1>   /* the date is in the picker beside it */
               : <><h1>Forecast performance · January 2026</h1><p>Delivery days {fmtDate(meta.firstDelivery)} – {fmtDate(meta.lastDelivery)}</p></>}
           </div>
           {tab === "decision" && (
