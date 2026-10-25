@@ -86,11 +86,8 @@ def detail(df: pd.DataFrame) -> str:
     return ml.md(pd.DataFrame(rows))
 
 
-def run() -> None:
-    if RESULT.exists():
-        sys.exit(f"{RESULT.name} exists: the 2024 confirmation has already been run once.")
-    if not report():
-        sys.exit("Stop rule failed: not running.")
+def result_text() -> str:
+    """The 2024 confirmation, computed (nothing written)."""
     forecasts, actuals = ml.load(NAMES)
     features = ml.build_features(forecasts, actuals)
     assert (features["latestInfoUtc"] <= features["cutoffUtc"]).all()
@@ -120,9 +117,31 @@ def run() -> None:
         "### 2024 by delivery month, all methods\n",
         detail(df),
     ])
-    RESULT.write_text(text + "\n")
+    return text + "\n"
+
+
+def run() -> None:
+    if RESULT.exists():
+        sys.exit(f"{RESULT.name} exists: the 2024 confirmation has already been run once.")
+    if not report():
+        sys.exit("Stop rule failed: not running.")
+    text = result_text()
+    RESULT.write_text(text)
     print(text)
 
 
+def verify() -> None:
+    """Recompute the 2024 confirmation and compare with the recorded output. Not a new run: nothing is written."""
+    recorded, fresh = RESULT.read_text(), result_text()
+    print(fresh)
+    if fresh == recorded:
+        print("VERIFY OK: matches analysis/cqr-2024-result.txt")
+        return
+    a, b = recorded.splitlines(), fresh.splitlines()
+    first = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
+    print(f"VERIFY MISMATCH at line {first + 1}:\n  recorded: {a[first] if first < len(a) else '<end>'}\n  now:      {b[first] if first < len(b) else '<end>'}")
+    sys.exit(1)
+
+
 if __name__ == "__main__":
-    {"report": report, "run": run}[sys.argv[1]]()
+    {"report": report, "run": run, "verify": verify}[sys.argv[1]]()

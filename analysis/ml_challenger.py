@@ -271,9 +271,9 @@ def dev() -> None:
     print(f"\nTraining time: {seconds:.1f} s for {len(DEV_MONTHS)} monthly retrains x {len(ALPHAS)} quantile models")
 
 
-def october() -> None:
-    if OCT_RESULT.exists():
-        sys.exit(f"The October confirmation has already been run once ({OCT_RESULT.name}). The rule allows one run.")
+def october_result(last: date | None = None) -> dict:
+    """The October 2026 confirmation, computed (nothing written). `last` pins the final delivery day (verify mode);
+    by default it is the latest day with complete outturn, as in the one recorded run."""
     names = ["vault-2025", "data", "data-2026-04-09", "data-2026-10"]
     forecasts, actuals = load(names)
     # Latest delivery day with every half-hour of outturn (46 or 50 on clock-change days).
@@ -282,7 +282,8 @@ def october() -> None:
     def periods(d):
         start = pd.Timestamp(d).tz_localize(an.UK_TZ)
         return int((pd.Timestamp(d + pd.Timedelta(days=1)).tz_localize(an.UK_TZ) - start) / pd.Timedelta(minutes=30))
-    last = max(d for d, n in per_day.items() if d >= OCT_FIRST_DELIVERY and n == periods(d))
+    if last is None:
+        last = max(d for d, n in per_day.items() if d >= OCT_FIRST_DELIVERY and n == periods(d))
     features = build_features(forecasts, actuals)
     scored = current_frame(names)
     scored = scored[(scored["deliveryDate"] >= OCT_FIRST_DELIVERY) & (scored["deliveryDate"] <= last)]
@@ -299,9 +300,38 @@ def october() -> None:
         "trainingSeconds": round(seconds, 1),
         "trainingRows": int(len(training_rows(features, date(2026, 10, 1)))),
     }
+    return json.loads(json.dumps(result))   # same types as the recorded JSON
+
+
+def october() -> None:
+    if OCT_RESULT.exists():
+        sys.exit(f"The October confirmation has already been run once ({OCT_RESULT.name}). The rule allows one run.")
+    result = october_result()
     OCT_RESULT.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, indent=2))
 
 
+def verify_october() -> None:
+    """Recompute the October confirmation and compare with the recorded result. Not a new run: nothing is written."""
+    recorded = json.loads(OCT_RESULT.read_text())
+    # Same period as the recorded run, even if later days have completed since.
+    fresh = october_result(date.fromisoformat(recorded["period"]["lastDelivery"]))
+    diffs = []
+    def walk(a, b, path=""):
+        if isinstance(a, dict):
+            for k in a:
+                if k != "trainingSeconds":   # wall-clock time, not a result
+                    walk(a[k], b.get(k) if isinstance(b, dict) else None, f"{path}.{k}")
+        elif isinstance(a, float) and isinstance(b, (int, float)):
+            if abs(a - b) > 1e-9 * max(1.0, abs(a)):
+                diffs.append(f"{path}: recorded {a}, now {b}")
+        elif a != b:
+            diffs.append(f"{path}: recorded {a!r}, now {b!r}")
+    walk(recorded, fresh)
+    print(f"verdict now: {fresh['verdict']} (recorded: {recorded['verdict']})")
+    print("VERIFY OK: matches analysis/ml-challenger-october.json" if not diffs else "VERIFY MISMATCH\n" + "\n".join(diffs))
+    sys.exit(1 if diffs else 0)
+
+
 if __name__ == "__main__":
-    {"dev": dev, "october": october}[sys.argv[1] if len(sys.argv) > 1 else "dev"]()
+    {"dev": dev, "october": october, "verify-october": verify_october}[sys.argv[1] if len(sys.argv) > 1 else "dev"]()

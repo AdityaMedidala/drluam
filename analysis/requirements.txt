@@ -1,0 +1,9 @@
+# Pinned versions for everything under analysis/ (make ml, make reproduce).
+# Reproduction is deterministic with these: LightGBM runs with deterministic=True, fixed seeds and force_row_wise.
+-r requirements-ml.txt
+pandas==3.0.3
+numpy==2.4.6
+matplotlib==3.11.0
+scipy==1.18.0
+requests==2.34.2
+pytest==9.1.1

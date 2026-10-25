@@ -31,7 +31,7 @@ The error is mostly in level, not timing: each day's own mean error accounts for
 | up | ±2h | 193 | 98 | 101 | 92 | 20 | 52% | 20% |
 | down | ±2h | 172 | 91 | 82 | 90 | 17 | 48% | 19% |
 | all | ±2h | 365 | 189 | 183 | 182 | 37 | 50% | 20% |
-| all | exact hour | 365 | 189 | 152 | 213 | 52 | 42% | 28% |
+| all | ±0h (exact hour) | 365 | 189 | 152 | 213 | 52 | 42% | 28% |
 
 The decision-time forecast catches only half of the ~30 ramps a month (183 of 365, allowing ±2 hours), and it is equally weak on up and down ramps. When it does predict a ramp it is usually right (80% are matched), but it predicts too few: 189 against 365 actual. When the actual ramps, the forecast's 3-hour change is typically only 68% as large, so the forecast is too smooth to warn a desk about ramps.
 

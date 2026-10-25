@@ -90,12 +90,33 @@ flowchart LR
 │   └── nginx.conf           # serves the SPA, proxies /api to the backend
 ├── analysis/                # out-of-app scripts (incl. ml_export.py for `make ml`) + data, not deployed
 ├── docs/                    # decisions (ADRs), validation, error anatomy, CQR studies, data-usage and research logs
-├── Makefile                 # `make ml` regenerates the ML predictions
+├── Makefile                 # dev, test, data, ml, smoke, reproduce, reproduce-app (see "Make targets")
 ├── docker-compose.yml
 └── vercel.json              # Vercel Services: frontend at /, FastAPI at /api
 ```
 
 ## Running it
+
+### Make targets
+
+| target | what it does | time (measured) |
+|---|---|---|
+| `make dev` | backend on :8000 with reload, frontend on :5173 (proxies `/api`); Ctrl-C stops both | – |
+| `make test` | backend pytest, analysis tests (incl. the `make ml` regeneration check), Playwright e2e with axe | ~3 min |
+| `make data` | re-fetch the app's January snapshot from Elexon into `backend/data` (rewrites its manifest) | ~15 s |
+| `make ml` | regenerate the precomputed ML predictions (`backend/data/ml_predictions.csv`, ADR-001) | ~2.5 min |
+| `make smoke URL=…` | smoke-test a deployment (`scripts/smoke_test.sh`) | ~5 s |
+| `make reproduce-app` | fast check: fetch the app snapshot, compare its sha256 with the manifest, check the README headline numbers on it, run the backend tests | ~20 s |
+| `make reproduce` | full check, described below | ~40 min |
+
+`make reproduce` (`analysis/reproduce.py`) rebuilds every number from Elexon:
+1. It fetches every period the docs use, plus the curtailment and NESO inputs, and compares each file's sha256 with its committed manifest. A file Elexon has since revised is reported by name as REVISED, and the checks run on the fetched data.
+2. It reruns every study.
+3. It runs the three pre-registered confirmations (vault, October 2026, 2024) in a **verify mode**. That recomputes them and compares with the recorded results, so it is not a new confirmation run.
+4. It checks every number each study prints against its doc, plus a registry of prose claims in the README and the ADR.
+5. It runs the backend and analysis tests, then prints a pass/fail table.
+
+A changed file is reported by name. **EXTENDED** means Elexon only added rows past the recorded range, for example a day that has finished since; the checks then use the recorded rows. **REVISED** means recorded values changed; the checks run on the fetched copy and the original is restored afterwards. Measured on a 10-core laptop on 25 Oct 2026, the full run took 39 min wall-clock: about 12 min of Elexon downloads and 9 min of studies and tests. It reported `analysis/data-2026-10/actuals_wind.csv` as extended (24 Oct had finished since the fetch), and every other file was identical. `--skip-fetch` runs the same checks on the local data in about 9 min. Determinism comes from the pinned versions in `analysis/requirements.txt`, with LightGBM run with `deterministic=True`, fixed seeds and row-wise training.
 
 ### With Docker (recommended)
 

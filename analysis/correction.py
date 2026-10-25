@@ -118,14 +118,18 @@ def main(mode: str):
         forecasts, actuals = load_dir(VAULT_DIR)
         t, pooled = evaluate(forecasts, actuals, VAULT_MONTHS)
         VAULT_MARKER.write_text(f"vault run at {datetime.now(timezone.utc).isoformat(timespec='seconds')}\n")
+    elif mode == "verify-vault":
+        # Recompute the vault result to compare with docs/correction.md. Not a new run: no marker is checked or written.
+        forecasts, actuals = load_dir(VAULT_DIR)
+        t, pooled = evaluate(forecasts, actuals, VAULT_MONTHS)
     else:
-        sys.exit("usage: correction.py dev|vault")
+        sys.exit("usage: correction.py dev|vault|verify-vault")
 
     print(f"<!-- {mode}: {pooled} -->\n")
     print(show(t))
     n_mae, n_bias = int(t["MAE lower"].sum()), int(t["|bias| higher"].sum())
     print(f"Months with lower MAE: {n_mae}/{len(t)}. Months with higher |bias|: {n_bias}/{len(t)}.")
-    if mode == "vault":
+    if mode in ("vault", "verify-vault"):
         verdict = "PASS" if n_mae >= 8 and n_bias <= 2 else "FAIL"
         print(f"Rule: MAE lower in >= 8 of 10 AND |bias| higher in <= 2 of 10. **Verdict: {verdict}**")
         ex = t.drop(index="2025-10")

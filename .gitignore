@@ -23,3 +23,6 @@ frontend/test-results/
 frontend/playwright-report/
 # Vercel CLI link and pulled env (holds an OIDC token)
 .env*
+
+# make reproduce scratch output
+analysis/.reproduce/
