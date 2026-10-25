@@ -4,7 +4,7 @@
 
 ## The problem
 
-Your desk buys power in the GB day-ahead auctions, which close at 09:20 UK on the day before delivery (EPEX). At that moment the latest national wind forecast (NESO's WINDFOR, published by Elexon) is your best view of how much wind will offset demand. If the forecast is too high, you buy too little and cover the gap later at short notice. If it is too low, you buy too much. The pilot asked two questions. What did the desk actually know at 09:20? How far can it be trusted?
+Your desk buys power in the GB day-ahead auctions, which close at 09:20 UK on the day before delivery (EPEX). At that moment the latest national wind forecast (NESO's WINDFOR, published by Elexon) is your best view of how much wind will offset demand. Where your volumes follow wind output, a forecast that is too high means you buy too little and cover the gap later at short notice. A forecast that is too low means you buy too much. The pilot asked two questions. What did the desk actually know at 09:20? How far can it be trusted?
 
 ## Three findings
 
@@ -23,6 +23,11 @@ Your desk buys power in the GB day-ahead auctions, which close at 09:20 UK on th
 - It uses data outside the pilot's scope (Elexon bid volumes).
 - Curtailment is known only after the fact, so it cannot simply be added at decision time.
 - One bad day, 28 Jan, is not explained by it.
+
+**What it means for your position.**
+- Most of the gap is wind that NESO turned down after the auctions closed.
+- If your own volumes follow metered wind output (for example a PPA paid on metered output), that shortfall is your exposure, and the findings and £ figures below apply.
+- If they don't, the gap mainly affects prices rather than your position.
 
 *Sources: README (key findings), docs/error-anatomy.md, docs/curtailment-check.md.*
 
@@ -52,7 +57,7 @@ The tails under-cover, so the app shows the measured hit rates, not the targets.
 - It would have cost **£694m less** than planning on the uncorrected forecast, in this backtest at these assumptions.
 - The bias correction alone accounts for £608m of that.
 
-**These are GB-wide volumes at assumed prices, not your exposure.**
+**These are GB-wide volumes at assumed prices, not your exposure,** and they assume your volumes follow metered wind (see finding 1).
 
 *Source: docs/cost-backtest.md.*
 
