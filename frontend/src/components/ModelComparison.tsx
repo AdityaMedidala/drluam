@@ -1,4 +1,4 @@
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@carbon/react";
+import { Link, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@carbon/react";
 import { useEffect, useState } from "react";
 import { api, type AccuracyResponse, type CostResponse } from "../api";
 import { fmtMW, fmtPct, fmtSignedMW } from "../format";
@@ -8,6 +8,8 @@ import { ErrorState, Loading } from "./ui";
 
 type Both = Record<Model, { acc: AccuracyResponse; cost: CostResponse }>;
 const LEVEL = 80;   // the default exceedance level
+const LEVELS = [50, 70, 80, 90, 95];
+const EVIDENCE = "https://github.com/AdityaMedidala/drluam/blob/main/docs/cqr-2024.md";
 
 /** Simple vs ML on January 2026, side by side, whichever model is selected (ADR-001). */
 export default function ModelComparison({ cutoff }: { cutoff: string }) {
@@ -26,13 +28,13 @@ export default function ModelComparison({ cutoff }: { cutoff: string }) {
     return () => { live = false; };
   }, [cutoff, available]);
 
-  const p90 = (a: AccuracyResponse) => a.planCalibration.find((r) => r.confidence === 90)?.januaryHitRate;
+  const hit = (a: AccuracyResponse, level: number) => a.planCalibration.find((r) => r.confidence === level)?.januaryHitRate;
   const cost = (c: CostResponse) => c.backtest.rows.find((r) => r.confidence === LEVEL)?.costGBP;
   const rows: [string, (b: Both[Model]) => string][] = [
     ["MAE", (b) => fmtMW(b.acc.comparison.adjusted.mae)],
-    ["Mean error", (b) => fmtSignedMW(b.acc.comparison.adjusted.bias)],
+    ["Mean error (+ = over-forecast)", (b) => fmtSignedMW(b.acc.comparison.adjusted.bias)],
     ["80% range coverage (target 80%)", (b) => fmtPct(b.acc.band.coverage)],
-    ["P90 hit rate (target 90%)", (b) => fmtPct(p90(b.acc))],
+    ...LEVELS.map((c): [string, (b: Both[Model]) => string] => [`P${c} hit rate (target ${c}%)`, (b) => fmtPct(hit(b.acc, c))]),
     [`Cost of the P${LEVEL} plan at £${DEFAULT_COSTS.short} short / £${DEFAULT_COSTS.long} long`, (b) => {
       const v = cost(b.cost);
       return v == null ? "–" : `£${(v / 1e6).toLocaleString("en-GB", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}m`;
@@ -63,8 +65,11 @@ export default function ModelComparison({ cutoff }: { cutoff: string }) {
               ))}
             </TableBody>
           </Table>
+          <p className="compare-caveat">
+            January is a single month. The evidence is the <Link href={EVIDENCE} target="_blank" rel="noopener noreferrer">2024 out-of-period test</Link>.
+          </p>
           <p className="cost-note">
-            {data.simple.acc.comparison.adjusted.n.toLocaleString("en-GB")} hours at {cutoff}. MAE and mean error are of the bias-corrected forecast (Simple) and the ML forecast (P50). Cost is GB-wide volume at illustrative prices.
+            {data.simple.acc.comparison.adjusted.n.toLocaleString("en-GB")} January hours at {cutoff}. Hit rates are for January. MAE and mean error are of the bias-corrected forecast (Simple) and the ML forecast (P50). Cost is GB-wide volume at illustrative prices.
           </p>
         </>
       )}

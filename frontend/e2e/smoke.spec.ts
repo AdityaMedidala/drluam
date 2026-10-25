@@ -194,3 +194,27 @@ test("the page title is never truncated on desktop widths", async ({ page }) => 
     expect(await h1.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
   }
 });
+
+test("under ML at P90 the 80% range low edge stays in the chart table next to the planning volume", async ({ page }) => {
+  await page.goto("/?date=2026-01-17&cutoff=09:20&confidence=90&model=ml");
+  const main = page.getByRole("main");
+  await main.getByRole("button", { name: "Hourly wind forecast · GW options" }).click();
+  await page.getByRole("menuitem", { name: "Show as table" }).click();
+  const headers = main.locator(".chart-table th");
+  await expect(headers.filter({ hasText: "P90 planning volume (MW)" })).toHaveCount(1);
+  await expect(headers.filter({ hasText: "80% range low (MW)" })).toHaveCount(1);
+});
+
+test("the Simple vs ML table shows every level's January hit rate, the sign of mean error, and the evidence caveat", async ({ page }) => {
+  await page.goto("/?view=accuracy&cutoff=09:20");
+  const compare = page.getByRole("region", { name: "Simple vs ML" });
+  await expect(compare.locator("tbody tr", { hasText: "Mean error (+ = over-forecast)" })).toHaveCount(1);
+  for (const [level, simple, ml] of [[50, "54%", "43%"], [70, "71%", "61%"], [80, "79%", "71%"], [90, "82%", "85%"], [95, "89%", "92%"]]) {
+    const row = compare.locator("tbody tr", { hasText: `P${level} hit rate` });
+    await expect(row).toContainText(`${level}%`);
+    await expect(row).toContainText(simple as string);
+    await expect(row).toContainText(ml as string);
+  }
+  await expect(compare).toContainText("January is a single month. The evidence is the 2024 out-of-period test");
+  await expect(compare.getByRole("link", { name: /2024 out-of-period test/ })).toHaveAttribute("href", /docs\/cqr-2024\.md$/);
+});

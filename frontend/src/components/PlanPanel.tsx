@@ -22,7 +22,7 @@ export default function PlanPanel({ plan, day, error, confidence, showActual }: 
   const pooled = level?.developmentHitRate != null;
   const hit = pooled ? level?.developmentHitRate : level?.januaryHitRate;
   const extra = plan.day.extraToProcureMWh;
-  const partial = day != null && day.historyPoints < day.historyPointsFull;
+  const partial = model === "simple" && day != null && day.historyPoints < day.historyPointsFull;   // Simple's 7-day window
 
   if (plan.day.planMWh == null) {
     return <p className="label">Insufficient history before {fmtDate(plan.date)} for a planning volume.</p>;

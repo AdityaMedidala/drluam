@@ -7,7 +7,7 @@ import {
 import { api, type AccuracyResponse } from "../api";
 import { fmtDate, fmtGWNumber, fmtMW, fmtPct, fmtSignedMW, gwAxis } from "../format";
 import { useChartColors, type ChartColors } from "../theme";
-import { adjustedName, adjustedShort, useModel } from "../model";
+import { adjustedInline, adjustedName, adjustedShort, useModel } from "../model";
 import ModelComparison from "./ModelComparison";
 import { ChartFrame, ChartLegend, ChartTooltip, ErrorState, Loading, plotFrame, xAxisProps, yAxisProps, type TableSpec } from "./ui";
 
@@ -165,7 +165,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
         <Tile className="tile">
           <ChartFrame title="Daily MAE · GW"
             legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast }, { label: adj, color: c.adjusted }]} />}
-            table={tables.dailyMae} fileName="daily-mae" plotClassName="plot" ariaLabel={`Daily MAE of the NESO and bias-corrected forecasts, in GW. ${note}`}>
+            table={tables.dailyMae} fileName="daily-mae" plotClassName="plot" ariaLabel={`Daily MAE of the NESO forecast and the ${adjustedInline(model)}, in GW. ${note}`}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={daily} accessibilityLayer margin={{ top: 8, right: 12, bottom: 0, left: 4 }}>
                 <CartesianGrid stroke={c.grid} />
@@ -251,9 +251,9 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
             <dt>Outturn</dt>
             <dd>FUELHH metered wind generation for the same hour.</dd>
             <dt>Mean error</dt>
-            <dd>Forecast minus outturn, averaged. Positive means over-forecast, the risk of under-buying. The NESO forecast was too high in {fmtPct(raw.overForecastShare)} of hours.</dd>
+            <dd>Forecast minus outturn, averaged. Positive means over-forecast, the risk of under-buying. The NESO forecast was too high in {fmtPct(raw.overForecastShare)} of hours. The ML forecast targets the median, not the mean, so its mean error can be larger even when its MAE is lower.</dd>
             <dt>MAE</dt>
-            <dd>Mean absolute error, the average size of the hourly error in MW. The % change compares the bias-corrected forecast with the NESO forecast.</dd>
+            <dd>Mean absolute error, the average size of the hourly error in MW. The % change compares the {adjustedInline(model)} with the NESO forecast.</dd>
             <dt>Bias-corrected forecast</dt>
             <dd>NESO forecast scaled by the previous 7 days’ outturn-to-forecast ratio. Only outturn known at decision time is used.{model === "simple" ? ` Its daily MAE was lower on ${cmp.daysAdjustedBetter} of ${cmp.days} days.` : ""}</dd>
             <dt>ML model (LightGBM + CQR)</dt>

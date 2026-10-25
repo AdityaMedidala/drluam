@@ -4,7 +4,7 @@ import { Area, CartesianGrid, ComposedChart, Customized, Line, ResponsiveContain
 import { api, type DayResponse, type DriftResponse, type Meta, type PlanResponse } from "../api";
 import { fmtMW, fmtTime, gwAxis } from "../format";
 import { useChartColors } from "../theme";
-import { adjustedName, adjustedShort, useModel } from "../model";
+import { adjustedInline, adjustedName, adjustedShort, useModel } from "../model";
 import CostPanel from "./CostPanel";
 import DriftPanel from "./DriftPanel";
 import PlanPanel from "./PlanPanel";
@@ -74,12 +74,14 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
     const hit = r ? (pooled ? r.developmentHitRate : r.januaryHitRate) : null;
     return hit == null ? "–" : `${Math.round((1 - hit) * 100)}%`;
   };
-  const showLow = confidence !== 90;   // at P90 the planning volume is the range's low edge: one column, not two
+  // Simple's P90 planning volume is the range's low edge (one column); ML calibrates them separately, so both show.
+  const showLow = !(confidence === 90 && model === "simple");
   const legend = [
     { label: "NESO forecast", color: c.forecast },
     ...(hasCorrection ? [{ label: adj, color: c.adjusted }] : []),
     { label: `P${confidence} planning volume`, color: c.plan, kind: "dash" as const },
     ...(hasCorrection ? [{ label: "80% range", color: c.band, kind: "band" as const }] : []),
+    ...(hasCorrection && model === "ml" ? [{ label: "80% range low edge", color: c.adjusted }] : []),
     ...(showActual ? [{ label: "Outturn", color: c.actual }] : []),
   ];
   const hourly = chartData.filter((p) => p.forecast != null);
@@ -111,7 +113,7 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
           {data && !error && (
             <ChartFrame title="Hourly wind forecast · GW"
               legend={<ChartLegend items={legend} />} table={table} fileName={`wind-forecast-${data.date}`} plotClassName="main-plot"
-              ariaLabel={`Hourly wind forecast in GW for ${data.date}: NESO forecast, bias-corrected forecast, P${confidence} planning volume and 80% range. Use Show as table for the values.`}>
+              ariaLabel={`Hourly wind forecast in GW for ${data.date}: NESO forecast, ${adjustedInline(model)}, P${confidence} planning volume and 80% range. Use Show as table for the values.`}>
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData} accessibilityLayer margin={{ top: 8, right: 16, bottom: 0, left: 4 }}>
                   <CartesianGrid stroke={c.grid} />
@@ -122,6 +124,8 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
                   {hasCorrection && <Area dataKey="band" stroke="none" fill={c.band} fillOpacity={c.bandOpacity} connectNulls isAnimationActive={false} />}
                   <Line dataKey="forecast" stroke={c.forecast} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
                   {hasCorrection && <Line dataKey="adjusted" stroke={c.adjusted} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />}
+                  {/* ML: the range's low edge as a thin line, under the dashed planning volume (they differ under ML) */}
+                  {hasCorrection && model === "ml" && <Line dataKey="low" stroke={c.adjusted} strokeWidth={1} strokeOpacity={0.6} dot={false} connectNulls isAnimationActive={false} />}
                   <Line dataKey="plan" stroke={c.plan} strokeWidth={2} strokeDasharray="6 4" dot={false} connectNulls isAnimationActive={false} />
                   {showActual && <Line dataKey="actual" stroke={c.actual} strokeWidth={1.5} dot={false} isAnimationActive={false} />}
                 </ComposedChart>
@@ -167,6 +171,7 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
             <dd>{model === "ml"
               ? "The ML model’s 10th to 90th percentile, widened or narrowed by its errors over the previous 28 days."
               : "Bias-corrected forecast plus the 10th to 90th percentile of the same errors."}</dd>
+            {model === "ml" && <dd>Under ML the P90 planning volume and the range’s low edge differ. The range uses two-sided calibration and each planning volume one-sided calibration.</dd>}
             <dt>Forecast revisions</dt>
             <dd>All runs published before the decision time, compared on the hours every run covers.</dd>
             <dt>Outturn</dt>
