@@ -21,7 +21,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from . import analysis as an
-from .data import FIRST_DELIVERY, LAST_DELIVERY, load_actuals, load_forecasts, provenance
+from .data import (FIRST_DELIVERY, LAST_DELIVERY, load_actuals, load_forecasts, load_ml_development,
+                   load_ml_predictions, provenance)
 
 DEFAULT_CUTOFF = "09:20"  # EPEX day-ahead gate closure
 CUTOFF_OPTIONS = ["06:00", "08:00", "09:00", "09:20", "09:30", "09:50", "10:00", "11:00"]
@@ -37,6 +38,11 @@ DEV_PLAN_VOLUMES = {50: (5032997, 4857127), 70: (2843679, 8220627), 80: (2019674
                     90: (1208053, 14708471), 95: (747046, 17940248)}
 DEV_HOURS = 7775
 DEV_PERIOD = {"firstDecision": date(2025, 11, 1), "lastDecision": date(2026, 9, 30)}
+
+# The optional ML model (LightGBM + CQR, ADR-001 in docs/decisions.md): precomputed at the
+# 09:20 decision time, which selects the same WINDFOR run as 09:00. Simple stays the default.
+MODELS = ("simple", "ml")
+ML_CUTOFFS = {"09:00", "09:20"}
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -81,23 +87,57 @@ def clean(obj):
     return obj
 
 
-@lru_cache(maxsize=len(CUTOFF_OPTIONS))
-def decision_frame(cutoff_str: str) -> pd.DataFrame:
-    """Cached per normalised cutoff -- callers pass normalise_cutoff() output."""
-    return an.build_decision_frame(load_forecasts(), load_actuals(), time.fromisoformat(cutoff_str))
+def normalise_model(model: str, cutoff: str) -> str:
+    """'simple' or 'ml'; ML only at the decision times it was precomputed for (else a 422)."""
+    if model not in MODELS:
+        raise HTTPException(422, f"model must be one of {list(MODELS)}, got {model!r}")
+    if model == "ml" and cutoff not in ML_CUTOFFS:
+        raise HTTPException(422, f"the ml model is precomputed for decision times {sorted(ML_CUTOFFS)} only, got {cutoff!r}")
+    return model
 
 
-def scoped_frame(cutoff_str: str) -> pd.DataFrame:
-    return an.in_scope(decision_frame(cutoff_str), FIRST_DELIVERY, LAST_DELIVERY)
+@lru_cache(maxsize=len(CUTOFF_OPTIONS) * len(MODELS))
+def decision_frame(cutoff_str: str, model: str = "simple") -> pd.DataFrame:
+    """Cached per normalised cutoff and model -- callers pass normalise_cutoff()/normalise_model() output.
+
+    The ML frame is the Simple frame with the January hours' adjusted forecast, 80% range and
+    planning volumes replaced by the precomputed LightGBM + CQR values (same columns, same shapes).
+    """
+    frame = an.build_decision_frame(load_forecasts(), load_actuals(), time.fromisoformat(cutoff_str))
+    if model == "simple":
+        return frame
+    ml = load_ml_predictions().set_index("startTime")
+    cols = {"adjusted": "p50", "low": "p10", "high": "p90", **{f"plan{c}": f"plan{c}" for c in an.PLAN_CONFIDENCES}}
+    frame = frame.copy()
+    for col, src in cols.items():
+        frame[col] = frame["startTime"].map(ml[src])        # NaN outside January: ML covers only the app's scope
+    frame["ratio"] = np.nan                                 # the ratio is the Simple model's, not ML's
+    frame["adjError"] = frame["adjusted"] - frame["actual"]
+    jan = an.in_scope(frame, FIRST_DELIVERY, LAST_DELIVERY)
+    assert jan["adjusted"].notna().all(), "every January hour must have an ML prediction"
+    return frame
 
 
-def plan_calibration(cutoff_str: str) -> list[dict]:
+def scoped_frame(cutoff_str: str, model: str = "simple") -> pd.DataFrame:
+    return an.in_scope(decision_frame(cutoff_str, model), FIRST_DELIVERY, LAST_DELIVERY)
+
+
+def dev_hit_rates(model: str) -> dict:
+    return {int(c): v for c, v in load_ml_development()["hitRates"].items()} if model == "ml" else DEV_PLAN_HIT_RATES
+
+
+def dev_volumes(model: str) -> dict:
+    return {int(c): tuple(v) for c, v in load_ml_development()["volumesMWh"].items()} if model == "ml" else DEV_PLAN_VOLUMES
+
+
+def plan_calibration(cutoff_str: str, model: str = "simple") -> list[dict]:
     """Every plan level's target next to the hit rate it actually achieved (January, and pooled dev months)."""
-    jan = scoped_frame(cutoff_str)
+    jan = scoped_frame(cutoff_str, model)
+    dev = dev_hit_rates(model)
     return [
         {"confidence": c, "target": c / 100,
          "januaryHitRate": an.plan_hit_rate(jan, c).get("hitRate"),
-         "developmentHitRate": DEV_PLAN_HIT_RATES[c] if cutoff_str in DEV_PLAN_CUTOFFS else None}
+         "developmentHitRate": dev[c] if cutoff_str in DEV_PLAN_CUTOFFS else None}
         for c in an.PLAN_CONFIDENCES
     ]
 
@@ -141,11 +181,12 @@ def meta():
 
 
 @app.get("/api/day")
-def day(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF):
+def day(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF, model: str = "simple"):
     if not FIRST_DELIVERY <= date_ <= LAST_DELIVERY:
         raise HTTPException(400, f"date must be between {FIRST_DELIVERY} and {LAST_DELIVERY}")
     cutoff = normalise_cutoff(cutoff)
-    frame = decision_frame(cutoff)
+    model = normalise_model(model, cutoff)
+    frame = decision_frame(cutoff, model)
     hourly = frame[frame["deliveryDate"] == date_].set_index("startTime")
 
     start = pd.Timestamp(date_, tz=an.UK_TZ).tz_convert("UTC")
@@ -178,7 +219,7 @@ def day(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF):
         "historyPoints": int(first["historyPoints"]) if first is not None else 0,
         "historyPointsFull": an.TRAILING_DAYS * 24,   # a complete trailing week of hourly matches
         # Realised coverage of the band over all delivery days at this cutoff, for labelling.
-        "bandCoverage": an.band_coverage(scoped_frame(cutoff)).get("coverage"),
+        "bandCoverage": an.band_coverage(scoped_frame(cutoff, model)).get("coverage"),
         "summary": {
             "forecastEnergyMWh": float(hourly["forecast"].sum()),      # hourly MW x 1h
             "adjustedEnergyMWh": float(hourly["adjusted"].sum(min_count=1)),
@@ -193,14 +234,15 @@ def day(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF):
 
 
 @app.get("/api/plan")
-def plan(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF, confidence: int = 80):
+def plan(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF, confidence: int = 80, model: str = "simple"):
     if not FIRST_DELIVERY <= date_ <= LAST_DELIVERY:
         raise HTTPException(400, f"date must be between {FIRST_DELIVERY} and {LAST_DELIVERY}")
     if confidence not in an.PLAN_CONFIDENCES:
         raise HTTPException(422, f"confidence must be one of {list(an.PLAN_CONFIDENCES)}, got {confidence}")
     cutoff = normalise_cutoff(cutoff)
+    model = normalise_model(model, cutoff)
     col = f"plan{confidence}"
-    hourly = decision_frame(cutoff)
+    hourly = decision_frame(cutoff, model)
     hourly = hourly[hourly["deliveryDate"] == date_]
     plan_mwh = float(hourly[col].sum(min_count=1))      # hourly MW x 1h
     raw_mwh = float(hourly["forecast"].sum())
@@ -218,30 +260,32 @@ def plan(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF, c
         },
         # Backtest over every in-scope delivery day at this cutoff.
         "backtest": {"period": {"firstDelivery": FIRST_DELIVERY, "lastDelivery": LAST_DELIVERY},
-                     **an.plan_hit_rate(scoped_frame(cutoff), confidence)},
-        "calibration": plan_calibration(cutoff),
+                     **an.plan_hit_rate(scoped_frame(cutoff, model), confidence)},
+        "calibration": plan_calibration(cutoff, model),
     })
 
 
 @app.get("/api/cost")
 def cost(cutoff: str = DEFAULT_CUTOFF,
          short: float = Query(100, gt=0, le=10_000, description="cost of being short, GBP/MWh"),
-         long: float = Query(30, gt=0, le=10_000, description="cost of being long, GBP/MWh")):
+         long: float = Query(30, gt=0, le=10_000, description="cost of being long, GBP/MWh"),
+         model: str = "simple"):
     """Cost-aware exceedance level: the newsvendor recommendation and a January cost backtest.
 
     Illustrative: the costs are the desk's assumptions, and nothing here changes the method.
     """
     cutoff = normalise_cutoff(cutoff)
+    model = normalise_model(model, cutoff)
     return clean({
         "cutoff": cutoff,
         "short": short,
         "long": long,
         "recommended": an.recommended_level(short, long),
         # Nov 2025 - Sep 2026 lowest-cost level; measured only where the run selection matches 09:20.
-        "development": {"bestLevel": an.best_level(DEV_PLAN_VOLUMES, short, long), "hours": DEV_HOURS, "period": DEV_PERIOD}
+        "development": {"bestLevel": an.best_level(dev_volumes(model), short, long), "hours": DEV_HOURS, "period": DEV_PERIOD}
                        if cutoff in DEV_PLAN_CUTOFFS else None,
         "backtest": {"period": {"firstDelivery": FIRST_DELIVERY, "lastDelivery": LAST_DELIVERY},
-                     **an.cost_backtest(scoped_frame(cutoff), short, long)},
+                     **an.cost_backtest(scoped_frame(cutoff, model), short, long)},
     })
 
 
@@ -270,9 +314,10 @@ def drift(date_: date = Query(..., alias="date"), cutoff: str = DEFAULT_CUTOFF):
 
 
 @app.get("/api/accuracy")
-def accuracy(cutoff: str = DEFAULT_CUTOFF):
+def accuracy(cutoff: str = DEFAULT_CUTOFF, model: str = "simple"):
     cutoff = normalise_cutoff(cutoff)
-    f = scoped_frame(cutoff).dropna(subset=["actual"])
+    model = normalise_model(model, cutoff)
+    f = scoped_frame(cutoff, model).dropna(subset=["actual"])
     both = f.dropna(subset=["adjusted"])  # hours where a correction was possible (enough history)
 
     uk_hour = f["startTime"].dt.tz_convert(an.UK_TZ).dt.hour
@@ -296,7 +341,7 @@ def accuracy(cutoff: str = DEFAULT_CUTOFF):
             "adjusted": an.error_metrics(both["adjError"], both["actual"]),
         },
         "band": an.band_coverage(f),
-        "planCalibration": plan_calibration(cutoff),
+        "planCalibration": plan_calibration(cutoff, model),
         "byHour": an.grouped_metrics(f, uk_hour),
         "byLevel": an.grouped_metrics(f, level),
         "byHorizon": an.horizon_metrics(load_forecasts(), load_actuals(), FIRST_DELIVERY, LAST_DELIVERY),

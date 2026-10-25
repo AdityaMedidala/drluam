@@ -37,11 +37,28 @@ def load_forecasts() -> pd.DataFrame:
     return df.sort_values(["publishTime", "startTime"]).reset_index(drop=True)
 
 
+@lru_cache(maxsize=1)
+def load_ml_predictions() -> pd.DataFrame:
+    """The optional ML model (LightGBM + CQR, ADR-001), precomputed by `make ml`: scored January hours only."""
+    df = pd.read_csv(DATA_DIR / "ml_predictions.csv")
+    df = df[df["scored"]].copy()
+    df["startTime"] = pd.to_datetime(df["startTime"], utc=True)
+    return df.reset_index(drop=True)
+
+
+@lru_cache(maxsize=1)
+def load_ml_development() -> dict:
+    """The ML recipe's Nov 2025 - Sep 2026 hit rates and short/long volumes per level (written by `make ml`)."""
+    return json.loads((DATA_DIR / "ml_development.json").read_text())
+
+
 def provenance(data_dir: Path = DATA_DIR) -> dict:
     """Where the snapshot came from, and whether each CSV still matches the sha256 in its manifest."""
     manifest = json.loads((data_dir / "manifest.json").read_text())
     files = []
-    for key in ("forecasts", "actuals"):
+    for key in ("forecasts", "actuals", "mlPredictions", "mlDevelopment"):
+        if key not in manifest:
+            continue
         entry = manifest[key]
         actual = hashlib.sha256((data_dir / entry["file"]).read_bytes()).hexdigest()
         files.append({"file": entry["file"], "sha256": entry["sha256"], "verified": actual == entry["sha256"]})
