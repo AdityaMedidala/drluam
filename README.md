@@ -5,7 +5,7 @@ A web app for a UK utility's day-ahead power buying team. It answers two questio
 1. **What was the latest wind forecast available when we had to decide?** For each delivery day, it shows the forecast the desk could actually see before the day-ahead auction closed. It also shows an adjusted forecast and an uncertainty band.
 2. **How much can we trust it?** Accuracy of those decision-time forecasts across January 2026: bias, MAE, error ranges, and breakdowns by lead time, wind level and hour of day.
 
-**Live app:** _<add Vercel URL>_
+**Live app:** https://drluam.vercel.app
 **Video walkthrough:** _<add unlisted YouTube URL>_
 
 ---
@@ -136,7 +136,9 @@ git diff analysis/*/manifest.json   # only fetchedAt should change; a sha256 cha
 
 ## Deployment
 
-Deployed on Vercel as one project using [Vercel Services](https://vercel.com/docs/services). The Vite frontend serves `/`, and the FastAPI backend serves `/api/*` (see `vercel.json`). Import the repo in Vercel, and it builds both.
+Deployed on Vercel as one project using [Vercel Services](https://vercel.com/docs/services). The Vite frontend serves `/`, and the FastAPI backend serves `/api/*` (see `vercel.json`). Import the repo in Vercel with the Root Directory left at the repo root and the Framework Preset set to Services. With Root Directory `frontend`, Vercel never reads `vercel.json`, so only the frontend builds and every `/api` call returns 404.
+
+Check a deployment with `scripts/smoke_test.sh https://drluam.vercel.app`. It checks health, meta, day, plan, accuracy and the page. The "Smoke test" GitHub Actions workflow runs it on demand.
 
 ## Design decisions and trade-offs
 
