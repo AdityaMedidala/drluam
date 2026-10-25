@@ -15,15 +15,16 @@ Web app for a UK utility's day-ahead buying desk. For each delivery day it shows
 | | NESO forecast | Bias-corrected |
 |---|---|---|
 | Mean absolute error (MAE) | 2,022 MW | 1,383 MW (−32%) |
-| Mean error (forecast − actual) | +1,746 MW | +320 MW (82% removed) |
+| Mean error (forecast − actual) | +1,746 MW | +320 MW (~82% removed) |
 | Error as share of output | 17.9% | 12.3% |
 | Hours over-forecast | 85% | 55% |
 
-Compared on the same 744 hours.
+Raw and adjusted are compared on the same 744 hours (31 delivery days, each with a full week of history).
 
 - The NESO forecast was too high in 85% of hours. A desk buying against it would under-buy.
+- The correction beat the raw forecast on 22 of 31 days.
 - Likely cause: curtailment (wind farms paid to switch off when the grid is congested). Accepted wind bids match about 87% of the gap ([docs/curtailment-check.md](docs/curtailment-check.md)).
-- The 80% range held actual wind in 69% of hours, not 80%. The app shows the measured figure.
+- The uncertainty band is too narrow: actual wind fell inside it in 69% of hours, not 80%. The app shows the measured figure.
 
 ## Architecture
 
