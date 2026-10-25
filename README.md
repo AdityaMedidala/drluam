@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/AdityaMedidala/drluam/actions/workflows/ci.yml/badge.svg)](https://github.com/AdityaMedidala/drluam/actions/workflows/ci.yml)
 
-**Live app:** https://drluam.vercel.app · **Video:** _<add unlisted YouTube URL>_ · **Client brief (2 pages):** [docs/pilot-brief.pdf](docs/pilot-brief.pdf)
+**Live app:** https://drluam.vercel.app · **Video:** https://youtu.be/2jz2zNpDsmQ · **Client brief (2 pages):** [docs/pilot-brief.pdf](docs/pilot-brief.pdf)
 
 Web app for a UK utility's day-ahead buying desk. For each delivery day it shows:
 

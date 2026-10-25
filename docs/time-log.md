@@ -15,7 +15,7 @@ Clock time I spent on the challenge, in IST (UTC+05:30). AI assistants (Claude i
 | 10:35–10:53 | 0.3 | Extra | Validated on Nov 2025 – Mar 2026, then a pre-registered holdout on Apr–Sep 2026. Error anatomy (level vs timing, ramps, high-wind flattening, run disagreement, worst days). Pre-registered uncertainty-band test: no candidate passed. |
 | 10:53–11:20 | 0.45 | Extra | Pre-registered a level-aware correction, tested once on the untouched Jan–Oct 2025 vault: failed (3 of 10 months), kept the simpler method. Prior-art deep research (public submissions, IEA/Messner evaluation standards, post-processing literature, GB data and market context). |
 | 11:20–13:05 | 0 | – | Break. |
-| 13:05–13:30 | 0.3 | Core | Master plan for the remaining work (PLAN.md), time log, git author fix. Prior-art fixes (09:20/09:50 cutoffs, 09:20 default, data checksums, analysis CSVs out of git). "Plan on" API and its backtest. |
+| 13:05–13:30 | 0.3 | Core | Master plan for the remaining work, time log, commit author set to the GitHub noreply address. Prior-art fixes (09:20/09:50 cutoffs, 09:20 default, data checksums, analysis CSVs out of git). "Plan on" API and its backtest. |
 | 13:30–13:50 | 0.3 | Core | "Plan on" panel, calibration chart, copy check, design pass on the Decision view. |
 | 13:50–14:14 | 0.4 | Extra | Method decisions (14-day band pre-registered, affine dropped), skill scores with day-block bootstrap, curtailment check with Elexon BOAV. |
 | 14:14–14:25 | 0.2 | Extra | Independent review of the new claims, five wording fixes, NESO constraint-volume cross-check. |
