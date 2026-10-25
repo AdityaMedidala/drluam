@@ -5,6 +5,12 @@ A web app for a UK utility's day-ahead power buying team. It answers two questio
 1. **What was the latest wind forecast available when we had to decide?** For each delivery day, it shows the forecast the desk could actually see before the day-ahead auction closed. It also shows an adjusted forecast and an uncertainty band.
 2. **How much can we trust it?** Accuracy of those decision-time forecasts across January 2026: bias, MAE, error ranges, and breakdowns by lead time, wind level and hour of day.
 
+**Two models.** A Model switch in the control bar chooses between them:
+- **Simple** is the default and the basis of every headline number below. It is a 7-day ratio correction with a residual band.
+- **ML** (LightGBM + CQR) is an optional challenger, precomputed for January at the 09:00 / 09:20 decision times.
+
+On an unseen year, 2024, ML's 80% range covered 80.0% of hours, and its pinball loss was 55 MW lower than Simple's [−81, −31]. Why it is optional and not the default: [ADR-001](docs/decisions.md).
+
 **Live app:** https://drluam.vercel.app
 **Video walkthrough:** _<add unlisted YouTube URL>_
 
@@ -32,6 +38,7 @@ A web app for a UK utility's day-ahead power buying team. It answers two questio
 ```mermaid
 flowchart LR
   E[Elexon BMRS API<br/>WINDFOR + FUELHH] -->|scripts/fetch_data.py| D[(backend/data/*.csv<br/>January snapshot)]
+  M[analysis/ml_export.py<br/>make ml] -->|precomputed ML predictions| D
   D --> A[analysis.py<br/>pick decision forecast<br/>correction + metrics]
   A --> API[FastAPI<br/>/api/meta /api/day /api/accuracy /api/plan /api/drift /api/cost]
   API --> UI[React + Recharts<br/>Decision view / Accuracy view]
@@ -63,6 +70,7 @@ flowchart LR
 │   │   ├── data.py          # loads the cached CSV snapshot
 │   │   └── main.py          # FastAPI routes
 │   ├── data/                # January 2026 snapshot from Elexon (actuals_wind.csv, forecasts_wind.csv, manifest.json)
+│   │                        # + the optional ML model, precomputed: ml_predictions.csv, ml_development.json
 │   ├── scripts/
 │   │   ├── fetch_data.py    # pulls WINDFOR + FUELHH from the Elexon API (chunked, with retries)
 │   │   └── explore_data.py  # data profiling: publish schedule, resolution, horizons, first metrics
@@ -76,11 +84,13 @@ flowchart LR
 │   │   ├── App.tsx          # Carbon UI shell, page header and controls
 │   │   ├── components/      # DecisionView, AccuracyView, shared UI
 │   │   ├── format.ts        # number/time formatting (UK time)
+│   │   ├── model.ts         # Simple / ML model switch and its labels
 │   │   └── theme.ts         # chart colours (colour-blind safe, light/dark)
 │   ├── Dockerfile           # build with Node, serve with nginx
 │   └── nginx.conf           # serves the SPA, proxies /api to the backend
-├── analysis/                # out-of-app scripts + Jan 2025 – Sep 2026 data (not deployed)
-├── docs/                    # validation, error anatomy, uncertainty, correction, data-usage log
+├── analysis/                # out-of-app scripts (incl. ml_export.py for `make ml`) + data, not deployed
+├── docs/                    # decisions (ADRs), validation, error anatomy, CQR studies, data-usage and research logs
+├── Makefile                 # `make ml` regenerates the ML predictions
 ├── docker-compose.yml
 └── vercel.json              # Vercel Services: frontend at /, FastAPI at /api
 ```
@@ -134,6 +144,8 @@ python backend/scripts/fetch_data.py --first-delivery 2025-01-02 --last-delivery
 git diff analysis/*/manifest.json   # only fetchedAt should change; a sha256 change means Elexon revised the data
 ```
 
+The ML model's predictions are regenerated from that analysis data with `make ml` (needs `pip install -r analysis/requirements-ml.txt`). The app itself never runs a model or imports LightGBM. `analysis/tests/test_ml_export.py` checks that a regeneration matches the shipped `backend/data/ml_predictions.csv`.
+
 ## Deployment
 
 Deployed on Vercel as one project using [Vercel Services](https://vercel.com/docs/services). The Vite frontend serves `/`, and the FastAPI backend serves `/api/*` (see `vercel.json`). Import the repo in Vercel with the Root Directory left at the repo root and the Framework Preset set to Services. With Root Directory `frontend`, Vercel never reads `vercel.json`, so only the frontend builds and every `/api` call returns 404.
@@ -145,6 +157,7 @@ Check a deployment with `scripts/smoke_test.sh https://drluam.vercel.app`. It ch
 - **Snapshot instead of live API calls.** The data is fixed history, so a snapshot gives fast, reproducible results. A production version would refresh on a schedule.
 - **Pandas in memory, no database.** About 30k rows. Results are cached per cutoff. A database would add moving parts without benefit at this size.
 - **Analysis logic kept free of I/O.** All of it lives in `analysis.py`, so it can be unit-tested directly.
+- **ML as an optional, precomputed challenger** ([ADR-001](docs/decisions.md)). The predictions ship as a checksummed CSV, so there is no ML at runtime. Simple stays the default because adding ML deviates on purpose from the project's data-usage rule. Becoming the default would need a pre-registered trial on Nov 2026+ data.
 - **Simple, explainable correction.** A multiplicative trailing ratio was chosen over a fitted model because the client can understand and audit it. A level-dependent correction is a natural next step, since the bias grows with wind level.
 
 ## Deeper analysis
@@ -157,7 +170,7 @@ Outside the app; each analysis runs the app's own logic unchanged on other month
 - [docs/error-anatomy.md](docs/error-anatomy.md): across Nov 2025 – Sep 2026 the error is mostly whole-day level, not timing (a per-day level fix would remove 55% of MAE, a time shift 17%). The forecast catches only half of >2 GW ramps.
 - [docs/plan-backtest.md](docs/plan-backtest.md): the planning volume at each exceedance level is about right at P50 but under-covers in the tail. Across Nov 2025 – Sep 2026 the P90 planning volume had a hit rate of 84% and the P95 volume 89% (January: 82% and 89%).
 - [docs/ml-challenger.md](docs/ml-challenger.md): **a LightGBM quantile challenger was not adoption-worthy** under its pre-registered rule. On October 2026 it had lower MAE (1,383 vs 1,533 MW) and pinball loss, both with intervals that include zero, but its 80% range held the outturn in only 49% of hours.
-- [docs/cqr-2024.md](docs/cqr-2024.md): **LightGBM + CQR confirmed out-of-period on 2024** (one pre-registered run on an unseen year). Its 80% range covered 80.0% of hours, within 75–85% in 10 of 12 months. Pinball loss was 55 MW lower than the current method's [−81, −31]. The app is unchanged; a change would need a Nov 2026+ trial.
+- [docs/cqr-2024.md](docs/cqr-2024.md): **LightGBM + CQR confirmed out-of-period on 2024** (one pre-registered run on an unseen year). Its 80% range covered 80.0% of hours, within 75–85% in 10 of 12 months. Pinball loss was 55 MW lower than the current method's [−81, −31]. It is now an optional ML model in the app, not the default ([ADR-001](docs/decisions.md)).
 - [docs/cqr.md](docs/cqr.md): **conformal calibration of the LightGBM challenger is promising, unconfirmed (needs Nov 2026+ data).** Its 80% range covered 80% of development hours, against 55% raw and 71% for the current method. Pinball loss was 50 MW lower than the current method's. The monthly coverage rule was met by the bare minimum (8 of 11 months).
 - [docs/cost-backtest.md](docs/cost-backtest.md): the cost-aware exceedance level (illustrative). At £100 short and £30 long per MWh the newsvendor ratio recommends P80, which was also the lowest-cost level pooled over Nov 2025 – Sep 2026. In January P70 cost least, £4.6m below P80. P80 would have cost £67m less than the NESO forecast in January in this backtest, at these assumptions.
 - [docs/uncertainty.md](docs/uncertainty.md): three alternative bands were tested against a rule fixed in advance. None beat the current band on pinball loss, so it is kept.
