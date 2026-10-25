@@ -67,32 +67,46 @@ flowchart LR
 
 ```
 .
+├── .github/workflows/
+│   ├── ci.yml               # on push: backend pytest, frontend build, Playwright with axe
+│   └── smoke.yml            # manual: smoke-test a deployed URL
 ├── backend/
 │   ├── app/
-│   │   ├── analysis.py      # core logic: decision-forecast selection, correction, metrics (pure pandas)
-│   │   ├── data.py          # loads the cached CSV snapshot
-│   │   └── main.py          # FastAPI routes
+│   │   ├── analysis.py      # core logic: decision-forecast selection, correction, metrics, cost (pure pandas)
+│   │   ├── data.py          # loads the CSV snapshot, the ML predictions and the provenance checksums
+│   │   └── main.py          # FastAPI routes under /api (model=simple|ml)
 │   ├── data/                # January 2026 snapshot from Elexon (actuals_wind.csv, forecasts_wind.csv, manifest.json)
 │   │                        # + the optional ML model, precomputed: ml_predictions.csv, ml_development.json
 │   ├── scripts/
 │   │   ├── fetch_data.py    # pulls WINDFOR + FUELHH from the Elexon API (chunked, with retries)
 │   │   └── explore_data.py  # data profiling: publish schedule, resolution, horizons, first metrics
-│   ├── tests/               # pytest: selection logic, no-leakage correction, metrics, API
+│   ├── tests/               # pytest: selection and no-leakage (analysis), API, golden README numbers, plan,
+│   │                        # cost, drift, ML model, data manifest and provenance checksums
 │   ├── Dockerfile
 │   ├── requirements.txt     # runtime deps
 │   └── requirements-dev.txt # + fetch script and test deps
 ├── frontend/
 │   ├── src/
-│   │   ├── api.ts           # typed API client
+│   │   ├── main.tsx         # entry point
 │   │   ├── App.tsx          # Carbon UI shell, page header and controls
-│   │   ├── components/      # DecisionView, AccuracyView, shared UI
+│   │   ├── api.ts           # typed API client
+│   │   ├── components/      # DecisionView, PlanPanel, CostPanel, DriftPanel, AccuracyView, ModelComparison, shared ui.tsx
+│   │   ├── app.scss         # Carbon styles (only the components used) and layout
 │   │   ├── format.ts        # number/time formatting (UK time)
 │   │   ├── model.ts         # Simple / ML model switch and its labels
-│   │   └── theme.ts         # chart colours (colour-blind safe, light/dark)
+│   │   ├── theme.ts         # chart colours (colour-blind safe, light/dark)
+│   │   └── url.ts           # view state kept in the URL
+│   ├── e2e/smoke.spec.ts    # Playwright end-to-end tests with axe accessibility checks
+│   ├── playwright.config.ts # starts its own backend and Vite server for the e2e tests
+│   ├── package.json, vite.config.ts, tsconfig.json, index.html   # Vite + React + TypeScript build
 │   ├── Dockerfile           # build with Node, serve with nginx
 │   └── nginx.conf           # serves the SPA, proxies /api to the backend
-├── analysis/                # out-of-app scripts (incl. ml_export.py for `make ml`) + data, not deployed
-├── docs/                    # decisions (ADRs), validation, error anatomy, CQR studies, data-usage and research logs
+├── analysis/                # out-of-app studies, ml_export.py (`make ml`), reproduce.py (`make reproduce`),
+│                            # tests/, recorded confirmation results, data manifests; the CSVs are not in git
+├── docs/                    # decisions (ADRs), pilot brief (.md + .pdf), studies, data-usage, research and time logs
+├── scripts/
+│   ├── smoke_test.sh        # smoke-test a deployment (`make smoke URL=…`)
+│   └── render_pilot_brief.cjs # renders docs/pilot-brief.md to PDF with Playwright
 ├── Makefile                 # dev, test, data, ml, smoke, reproduce, reproduce-app (see "Make targets")
 ├── docker-compose.yml
 └── vercel.json              # Vercel Services: frontend at /, FastAPI at /api
