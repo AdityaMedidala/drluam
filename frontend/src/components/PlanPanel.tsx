@@ -1,6 +1,7 @@
 import { DefinitionTooltip, StructuredListBody, StructuredListCell, StructuredListRow, StructuredListWrapper } from "@carbon/react";
 import type { DayResponse, PlanResponse } from "../api";
 import { fmtDate, fmtGWh0, fmtPct } from "../format";
+import { adjustedName, useModel } from "../model";
 import { ErrorState, Loading } from "./ui";
 
 export const CONFIDENCES = [50, 70, 80, 90, 95];
@@ -14,6 +15,7 @@ const runTime = (iso: string) =>
 export default function PlanPanel({ plan, day, error, confidence, showActual }: {
   plan: PlanResponse | null; day: DayResponse | null; error: string | null; confidence: number; showActual: boolean;
 }) {
+  const model = useModel();
   if (error) return <ErrorState error={error} />;
   if (!plan) return <Loading height={260} />;
   const level = plan.calibration.find((r) => r.confidence === confidence);
@@ -36,7 +38,7 @@ export default function PlanPanel({ plan, day, error, confidence, showActual }: 
             <StructuredListCell>{fmtGWh0(plan.day.rawForecastMWh)}</StructuredListCell>
           </StructuredListRow>
           <StructuredListRow>
-            <StructuredListCell>Bias-corrected forecast</StructuredListCell>
+            <StructuredListCell>{adjustedName(model)}</StructuredListCell>
             <StructuredListCell>{fmtGWh0(plan.day.adjustedMWh)}</StructuredListCell>
           </StructuredListRow>
           {extra != null && (
@@ -49,7 +51,7 @@ export default function PlanPanel({ plan, day, error, confidence, showActual }: 
             <StructuredListCell>
               <DefinitionTooltip openOnHover align="bottom-left"
                 definition={pooled
-                  ? "Share of hours with outturn at or above the planning volume, Nov 2025–Sep 2026 backtest (7,775 hours, same method)."
+                  ? "Share of hours with outturn at or above the planning volume, Nov 2025–Sep 2026 backtest (7,775 hours, same model)."
                   : "Share of January 2026 hours with outturn at or above the planning volume (the longer backtest covers the 09:00/09:20 decision times only)."}>
                 P{confidence} hit rate (backtest)
               </DefinitionTooltip>

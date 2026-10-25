@@ -43,7 +43,7 @@ $bar: 82px;
 $chrome: 48px + $bar;
 .control-bar {
   position: sticky; top: 48px; z-index: 5;
-  display: flex; align-items: flex-end; gap: $spacing-05; flex-wrap: wrap;
+  display: flex; align-items: flex-end; gap: $spacing-04; flex-wrap: nowrap;   // one row on desktop: the title truncates first
   margin-top: 48px; padding: $spacing-03 $spacing-07; height: $bar;
   background: var(--cds-layer-01); border-bottom: 1px solid var(--cds-border-subtle-01);
 }
@@ -51,7 +51,7 @@ $chrome: 48px + $bar;
 .control-bar .cds--content-switcher { width: auto; }
 .control-bar .spacer { flex: 1; }
 .page-title { margin-right: auto; align-self: center; }
-.page-title h1 { margin: 0; font-size: 1.25rem; font-weight: 400; line-height: 1.4; white-space: nowrap; }
+.page-title h1 { margin: 0; font-size: 1.25rem; font-weight: 400; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .page-title p { margin: 0; font-size: 0.75rem; color: var(--cds-text-secondary); }
 
 .page { max-width: 1600px; margin: 0 auto; padding: $spacing-05 $spacing-07; }
@@ -118,7 +118,7 @@ $chrome: 48px + $bar;
   .decision { grid-template-columns: 1fr; }
   .three { grid-template-columns: 1fr; }
 }
-@media (max-width: 1055px) { .control-bar { position: static; height: auto; } .page-title { width: 100%; } }
+@media (max-width: 1055px) { .control-bar { position: static; height: auto; flex-wrap: wrap; } .page-title { width: 100%; } }
 @media (max-width: 671px) { .methodology { grid-template-columns: 1fr; row-gap: $spacing-02; } .methodology dd { margin-bottom: $spacing-04; } }
 @media (max-width: 671px) {
   .control-bar, .page { padding-left: $spacing-05; padding-right: $spacing-05; }
@@ -128,6 +128,7 @@ $chrome: 48px + $bar;
 }
 .control-bar > * { flex-shrink: 0; }
 .control-bar .page-title { flex-shrink: 1; min-width: 0; }
+.control-bar > :not(.page-title) { flex-shrink: 0; }   // controls keep their size; only the title gives way
 .control-bar .cds--date-picker.cds--date-picker--single .cds--date-picker__input { width: 9.5rem; }
 .control-bar .cds--content-switcher-btn { min-width: 3.25rem; }
 
@@ -194,3 +195,9 @@ $chrome: 48px + $bar;
 .cost-inputs .cds--label { white-space: nowrap; }
 .cost-note { margin-top: $spacing-02; font-size: 0.75rem; color: var(--cds-text-secondary); }
 .cost-table tr.lowest td { font-weight: 600; background: var(--cds-layer-selected-01); }
+
+// Simple vs ML comparison (Accuracy view)
+.model-compare .chart-title { margin-bottom: $spacing-04; }
+.compare-table { max-width: 720px; }
+.compare-table th { white-space: nowrap; }
+.compare-tile { margin-top: 0; margin-bottom: $spacing-05; }

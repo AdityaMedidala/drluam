@@ -1,5 +1,6 @@
 // Typed client for the FastAPI backend. All calls are relative (/api/...),
 // proxied by Vite in dev, nginx in Docker, and same-origin on Vercel.
+import type { Model } from "./model";
 
 export interface Meta {
   firstDelivery: string;
@@ -147,11 +148,11 @@ async function get<T>(path: string, params: Record<string, string> = {}): Promis
 export const api = {
   meta: () => get<Meta>("/meta"),
   provenance: () => get<Provenance>("/provenance"),
-  day: (date: string, cutoff: string) => get<DayResponse>("/day", { date, cutoff }),
-  accuracy: (cutoff: string) => get<AccuracyResponse>("/accuracy", { cutoff }),
+  day: (date: string, cutoff: string, model: Model = "simple") => get<DayResponse>("/day", { date, cutoff, model }),
+  accuracy: (cutoff: string, model: Model = "simple") => get<AccuracyResponse>("/accuracy", { cutoff, model }),
   drift: (date: string, cutoff: string) => get<DriftResponse>("/drift", { date, cutoff }),
-  cost: (cutoff: string, short: number, long: number) =>
-    get<CostResponse>("/cost", { cutoff, short: String(short), long: String(long) }),
-  plan: (date: string, cutoff: string, confidence: number) =>
-    get<PlanResponse>("/plan", { date, cutoff, confidence: String(confidence) }),
+  cost: (cutoff: string, short: number, long: number, model: Model = "simple") =>
+    get<CostResponse>("/cost", { cutoff, short: String(short), long: String(long), model }),
+  plan: (date: string, cutoff: string, confidence: number, model: Model = "simple") =>
+    get<PlanResponse>("/plan", { date, cutoff, confidence: String(confidence), model }),
 };

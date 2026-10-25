@@ -4,6 +4,7 @@ import { Area, CartesianGrid, ComposedChart, Customized, Line, ResponsiveContain
 import { api, type DayResponse, type DriftResponse, type Meta, type PlanResponse } from "../api";
 import { fmtMW, fmtTime, gwAxis } from "../format";
 import { useChartColors } from "../theme";
+import { adjustedName, adjustedShort, useModel } from "../model";
 import CostPanel from "./CostPanel";
 import DriftPanel from "./DriftPanel";
 import PlanPanel from "./PlanPanel";
@@ -15,6 +16,8 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
   costs: { short: number; long: number }; onCosts: (short: number, long: number) => void; onConfidence: (c: number) => void;
 }) {
   const c = useChartColors();
+  const model = useModel();
+  const adj = adjustedName(model);
   const [data, setData] = useState<DayResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<PlanResponse | null>(null);
@@ -27,16 +30,16 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
     let live = true;
     setData(null);   // never show the previous day's numbers under a new date or cutoff
     setError(null);
-    api.day(date, cutoff).then((d) => live && setData(d)).catch((e) => live && setError(String(e)));
+    api.day(date, cutoff, model).then((d) => live && setData(d)).catch((e) => live && setError(String(e)));
     return () => { live = false; };
-  }, [date, cutoff]);
+  }, [date, cutoff, model]);
   useEffect(() => {
     let live = true;
     setPlan(null);
     setPlanError(null);
-    api.plan(date, cutoff, confidence).then((p) => live && setPlan(p)).catch((e) => live && setPlanError(String(e)));
+    api.plan(date, cutoff, confidence, model).then((p) => live && setPlan(p)).catch((e) => live && setPlanError(String(e)));
     return () => { live = false; };
-  }, [date, cutoff, confidence]);
+  }, [date, cutoff, confidence, model]);
   useEffect(() => {
     let live = true;
     setDrift(null);
@@ -61,14 +64,20 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
     ...(drift?.runs ?? []).flatMap((r) => r.hours.map((h) => h.forecastMW)),
   ]), [chartData, drift, showActual]);
 
-  const hasCorrection = data?.correctionRatio != null;
+  const hasCorrection = model === "ml" ? data != null : data?.correctionRatio != null;
   const ratio = data?.correctionRatio ?? null;
   // same source switch as PlanPanel: pooled Nov–Sep backtest where measured, otherwise January at this cutoff
   const pooled = plan?.calibration.find((r) => r.confidence === confidence)?.developmentHitRate != null;
+  // Share of hours below a level's planning volume, from the same backtest as the hit rate (pooled where measured).
+  const missed = (level: number) => {
+    const r = plan?.calibration.find((x) => x.confidence === level);
+    const hit = r ? (pooled ? r.developmentHitRate : r.januaryHitRate) : null;
+    return hit == null ? "–" : `${Math.round((1 - hit) * 100)}%`;
+  };
   const showLow = confidence !== 90;   // at P90 the planning volume is the range's low edge: one column, not two
   const legend = [
     { label: "NESO forecast", color: c.forecast },
-    ...(hasCorrection ? [{ label: "Bias-corrected forecast", color: c.adjusted }] : []),
+    ...(hasCorrection ? [{ label: adj, color: c.adjusted }] : []),
     { label: `P${confidence} planning volume`, color: c.plan, kind: "dash" as const },
     ...(hasCorrection ? [{ label: "80% range", color: c.band, kind: "band" as const }] : []),
     ...(showActual ? [{ label: "Outturn", color: c.actual }] : []),
@@ -76,7 +85,7 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
   const hourly = chartData.filter((p) => p.forecast != null);
   const table: TableSpec = {
     columns: [
-      { label: "Time (UK)" }, { label: "NESO forecast (MW)", numeric: true }, { label: "Bias-corrected (MW)", numeric: true },
+      { label: "Time (UK)" }, { label: "NESO forecast (MW)", numeric: true }, { label: `${adjustedShort(model)} (MW)`, numeric: true },
       { label: `P${confidence} planning volume (MW)`, numeric: true },
       ...(showLow ? [{ label: "80% range low (MW)", numeric: true }] : []), { label: "80% range high (MW)", numeric: true },
       ...(showActual ? [{ label: "Outturn (MW)", numeric: true }] : []),
@@ -109,7 +118,7 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
                   <XAxis dataKey="time" tickFormatter={fmtTime} ticks={hourTicks} interval="equidistantPreserveStart" minTickGap={6} {...xAxisProps(c)} />
                   <YAxis {...yAxis} {...yAxisProps(c)} />
                   <Customized component={plotFrame(c)} />
-                  <Tooltip content={<DayTooltip showActual={showActual} confidence={confidence} c={c} />} />
+                  <Tooltip content={<DayTooltip showActual={showActual} confidence={confidence} c={c} adj={adj} />} />
                   {hasCorrection && <Area dataKey="band" stroke="none" fill={c.band} fillOpacity={c.bandOpacity} connectNulls isAnimationActive={false} />}
                   <Line dataKey="forecast" stroke={c.forecast} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
                   {hasCorrection && <Line dataKey="adjusted" stroke={c.adjusted} strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />}
@@ -131,8 +140,12 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
             <dd>Publication time of that run. Lead time is the hours from publication to the first and last delivery hour.</dd>
             <dt>Bias-corrected forecast</dt>
             <dd>NESO forecast scaled by the previous 7 days’ outturn-to-forecast ratio. Only outturn known at decision time is used.{ratio != null ? <> The ratio for this day is {ratio.toFixed(2)}.</> : null}</dd>
+            <dt>ML model (LightGBM + CQR)</dt>
+            <dd>An optional second model. A LightGBM quantile model reads the same decision-time inputs, including the forecast level, hour, weekday, lead time and last week’s errors. It is retrained monthly on earlier data only. Conformalized quantile regression then recalibrates it on its own errors over the previous 28 days. It is precomputed for January at 09:00 and 09:20. Evidence and limits are in docs/cqr-2024.md and docs/decisions.md.</dd>
             <dt>P{confidence} planning volume</dt>
-            <dd>Hourly bias-corrected forecast plus the {ordinal(100 - confidence)} percentile of the previous 7 days’ hourly errors. Floored at zero and summed over the day.{confidence === 90 ? " Equal to the low edge of the 80% range." : ""}</dd>
+            <dd>{model === "ml"
+              ? <>The ML model’s volume met with {confidence}% probability, recalibrated on its errors over the previous 28 days. Floored at zero and summed over the day.</>
+              : <>Hourly bias-corrected forecast plus the {ordinal(100 - confidence)} percentile of the previous 7 days’ hourly errors. Floored at zero and summed over the day.{confidence === 90 ? " Equal to the low edge of the 80% range." : ""}</>}</dd>
             <dt>Δ vs NESO forecast</dt>
             <dd>Planning volume minus NESO forecast. Negative means plan for less wind.</dd>
             <dt>Hit rate</dt>
@@ -149,9 +162,11 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
             <dd>The backtest best level can differ from theory. Under-covering tails push it up. Single months are noisy, and the cost curve is flat near the optimum. This is a decision aid, not a validated method change.</dd>
             <dd>Most of the saving comes from the bias correction itself. Level choice adds a smaller refinement.</dd>
             <dt>Under-coverage</dt>
-            <dd>P90 missed 16% of hours (target 10%). P95 missed 11% (target 5%). Whole-day shortfalls happen more often than the previous week suggests.</dd>
+            <dd>P90 missed {missed(90)} of hours (target 10%). P95 missed {missed(95)} (target 5%).{model === "simple" ? " Whole-day shortfalls happen more often than the previous week suggests." : ""}</dd>
             <dt>80% range</dt>
-            <dd>Bias-corrected forecast plus the 10th to 90th percentile of the same errors.</dd>
+            <dd>{model === "ml"
+              ? "The ML model’s 10th to 90th percentile, widened or narrowed by its errors over the previous 28 days."
+              : "Bias-corrected forecast plus the 10th to 90th percentile of the same errors."}</dd>
             <dt>Forecast revisions</dt>
             <dd>All runs published before the decision time, compared on the hours every run covers.</dd>
             <dt>Outturn</dt>
@@ -168,12 +183,12 @@ export default function DecisionView({ meta, cutoff, date, confidence, showActua
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function DayTooltip({ active, payload, showActual, confidence, c }: any) {
+function DayTooltip({ active, payload, showActual, confidence, c, adj }: any) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   const rows = [
     p.forecast != null && { label: "NESO forecast", value: fmtMW(p.forecast), color: c.forecast },
-    p.adjusted != null && { label: "Bias-corrected forecast", value: fmtMW(p.adjusted), color: c.adjusted },
+    p.adjusted != null && { label: adj, value: fmtMW(p.adjusted), color: c.adjusted },
     p.plan != null && { label: `P${confidence} planning volume`, value: fmtMW(p.plan), color: c.plan },
     p.low != null && { label: "80% range", value: `${fmtMW(p.low)} – ${fmtMW(p.high)}`, color: c.band },
     showActual && p.actual != null && { label: "Outturn", value: fmtMW(p.actual), color: c.actual },

@@ -12,12 +12,14 @@ import DecisionView from "./components/DecisionView";
 import { CONFIDENCES } from "./components/PlanPanel";
 import { ErrorState, Loading } from "./components/ui";
 import { fmtDate, shiftDate } from "./format";
+import { ML_CUTOFFS, MODELS, ModelContext, modelLabel, type Model } from "./model";
 import { setTheme, useTheme } from "./theme";
 import { readParam, writeParam } from "./url";
 
 // GB day-ahead auction gate closures (UK time).
 const GATES: Record<string, string> = { "09:20": "EPEX gate", "09:50": "N2EX gate" };
 const cutoffLabel = (o: string | null | undefined) => (o ? `${o}${GATES[o] ? ` (${GATES[o]})` : ""}` : "");
+type Item = { id: string; disabled: boolean };
 
 type Tab = "decision" | "accuracy";
 
@@ -49,6 +51,7 @@ export default function App() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>(readParam("view") === "accuracy" ? "accuracy" : "decision");
+  const [model, setModel] = useState<Model>(() => (readParam("model") === "ml" ? "ml" : "simple"));
   const [cutoff, setCutoff] = useState("09:20");
   const [date, setDate] = useState<string | null>(null);
   const [confidence, setConfidence] = useState(initialConfidence);
@@ -68,7 +71,9 @@ export default function App() {
   useEffect(() => {
     api.meta().then((m) => {
       const c = readParam("cutoff");
-      setCutoff(c && m.cutoffOptions.includes(c) ? c : m.defaultCutoff);
+      const cut = c && m.cutoffOptions.includes(c) ? c : m.defaultCutoff;
+      setCutoff(cut);
+      if (!ML_CUTOFFS.includes(cut)) setModel("simple");   // ML exists only at 09:00 / 09:20
       const d = readParam("date");
       setDate(d && d >= m.firstDelivery && d <= m.lastDelivery ? d : m.representativeDelivery);
       setMeta(m);
@@ -81,6 +86,7 @@ export default function App() {
   useEffect(() => { writeParam("actual", showActual ? "1" : null); }, [showActual]);
   useEffect(() => { writeParam("short", String(costs.short)); writeParam("long", String(costs.long)); }, [costs]);
   useEffect(() => { writeParam("view", tab === "accuracy" ? "accuracy" : null); }, [tab]);
+  useEffect(() => { writeParam("model", model); }, [model]);
 
   return (
     <Theme theme={theme === "dark" ? "g100" : "g10"} className="app-theme">
@@ -101,7 +107,10 @@ export default function App() {
         </HeaderGlobalBar>
       </Header>
 
-      {meta && date && (
+      {meta && date && (() => {
+        const cutoffItems: Item[] = meta.cutoffOptions.map((o) => ({ id: o, disabled: model === "ml" && !ML_CUTOFFS.includes(o) }));
+        const modelItems: Item[] = MODELS.map((m) => ({ id: m, disabled: m === "ml" && !ML_CUTOFFS.includes(cutoff) }));
+        return (
         <section className="control-bar" aria-label="View controls">
           <div className="page-title">
             {tab === "decision"
@@ -123,9 +132,17 @@ export default function App() {
             </div>
           )}
           <div style={{ width: 200 }}>
+            {/* With ML selected, decision times it wasn't precomputed for are disabled (and vice versa below). */}
             <Dropdown id="cutoff" titleText="Decision time (D-1, UK)" label="Decision time" size="md"
-              items={meta.cutoffOptions} itemToString={cutoffLabel} selectedItem={cutoff}
-              onChange={({ selectedItem }: { selectedItem: string | null }) => selectedItem && setCutoff(selectedItem)} />
+              items={cutoffItems} itemToString={(i: Item | null) => cutoffLabel(i?.id)}
+              selectedItem={cutoffItems.find((i) => i.id === cutoff)}
+              onChange={({ selectedItem }: { selectedItem: Item | null }) => selectedItem && setCutoff(selectedItem.id)} />
+          </div>
+          <div style={{ width: 210 }}>
+            <Dropdown id="model" titleText="Model" label="Model" size="md"
+              items={modelItems} itemToString={(i: Item | null) => (i ? modelLabel(i.id as Model) : "")}
+              selectedItem={modelItems.find((i) => i.id === model)}
+              onChange={({ selectedItem }: { selectedItem: Item | null }) => selectedItem && setModel(selectedItem.id as Model)} />
           </div>
           {tab === "decision" && (
             <>
@@ -144,8 +161,10 @@ export default function App() {
             </>
           )}
         </section>
-      )}
+        );
+      })()}
 
+      <ModelContext.Provider value={model}>
       <main className="page" style={meta ? undefined : { marginTop: 48 }}>
         {error && <ErrorState error={error} />}
         {!meta && !error && <Loading height={400} />}
@@ -162,6 +181,7 @@ export default function App() {
           {" "}UK local time.
         </footer>
       </main>
+      </ModelContext.Provider>
     </Theme>
   );
 }

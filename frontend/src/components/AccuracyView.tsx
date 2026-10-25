@@ -7,11 +7,16 @@ import {
 import { api, type AccuracyResponse } from "../api";
 import { fmtDate, fmtGWNumber, fmtMW, fmtPct, fmtSignedMW, gwAxis } from "../format";
 import { useChartColors, type ChartColors } from "../theme";
+import { adjustedName, adjustedShort, useModel } from "../model";
+import ModelComparison from "./ModelComparison";
 import { ChartFrame, ChartLegend, ChartTooltip, ErrorState, Loading, plotFrame, xAxisProps, yAxisProps, type TableSpec } from "./ui";
 
 /** "How far can we trust the forecast?" across all January decisions. */
 export default function AccuracyView({ cutoff }: { cutoff: string }) {
   const c = useChartColors();
+  const model = useModel();
+  const adj = adjustedName(model);
+  const adjS = adjustedShort(model);
   const [data, setData] = useState<AccuracyResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Charts in a collapsed accordion would render at 0×0; mount them only once it opens.
@@ -21,9 +26,9 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
     let live = true;
     setData(null);
     setError(null);
-    api.accuracy(cutoff).then((d) => live && setData(d)).catch((e) => live && setError(String(e)));
+    api.accuracy(cutoff, model).then((d) => live && setData(d)).catch((e) => live && setError(String(e)));
     return () => { live = false; };
-  }, [cutoff]);
+  }, [cutoff, model]);
 
   if (error) return <ErrorState error={error} />;
   if (!data) return <Loading height={420} />;
@@ -35,6 +40,11 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
   const hasDev = calibration.some((r) => r.developmentHitRate != null);
   const p90 = calibration.find((r) => r.confidence === 90);
   const p90Pooled = p90?.developmentHitRate != null;
+  const missed = (level: number) => {
+    const r = calibration.find((x) => x.confidence === level);
+    const hit = r ? (hasDev ? r.developmentHitRate : r.januaryHitRate) : null;
+    return hit == null ? "–" : `${Math.round((1 - hit) * 100)}%`;
+  };
   const daily = data.daily.map((d) => ({
     ...d, label: fmtDate(d.deliveryDate), short: fmtDate(d.deliveryDate).split(" ").slice(1).join(" "), gap: [d.actual, d.forecast],
   }));
@@ -46,15 +56,15 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
   const tables: Record<string, TableSpec> = {
     top: { columns: [{ label: "Delivery day" }, { label: "NESO forecast, mean (MW)", numeric: true }, { label: "Outturn, mean (MW)", numeric: true }, { label: "Difference (MW)", numeric: true }],
       rows: daily.map((d) => [d.label, d.forecast, d.actual, d.forecast - d.actual]) },
-    level: { columns: [{ label: "Forecast level" }, { label: "Hours", numeric: true }, { label: "NESO mean error (MW)", numeric: true }, { label: "Bias-corrected mean error (MW)", numeric: true }],
+    level: { columns: [{ label: "Forecast level" }, { label: "Hours", numeric: true }, { label: "NESO mean error (MW)", numeric: true }, { label: `${adjS} mean error (MW)`, numeric: true }],
       rows: data.byLevel.map((r) => [r.group, r.n, r.errorBias, r.adjErrorBias ?? null]) },
     calibration: { columns: [{ label: "Exceedance level" }, { label: "Target" }, { label: "Hit rate, January 2026" }, { label: "Hit rate, Nov 2025 – Sep 2026" }],
       rows: calibration.map((r) => [`P${r.confidence}`, pct(r.target), pct(r.januaryHitRate), pct(r.developmentHitRate)]) },
-    dailyMae: { columns: [{ label: "Delivery day" }, { label: "NESO MAE (MW)", numeric: true }, { label: "Bias-corrected MAE (MW)", numeric: true }],
+    dailyMae: { columns: [{ label: "Delivery day" }, { label: "NESO MAE (MW)", numeric: true }, { label: `${adjS} MAE (MW)`, numeric: true }],
       rows: daily.map((d) => [d.label, d.maeRaw, d.maeAdjusted]) },
     lead: { columns: [{ label: "Lead time" }, { label: "Hours", numeric: true }, { label: "MAE (MW)", numeric: true }, { label: "Mean error (MW)", numeric: true }],
       rows: data.byHorizon.map((r) => [r.group.startsWith("<0h") ? "elapsed" : r.group, r.n, r.errorMae, r.errorBias]) },
-    hour: { columns: [{ label: "Hour (UK)" }, { label: "NESO MAE (MW)", numeric: true }, { label: "Bias-corrected MAE (MW)", numeric: true }],
+    hour: { columns: [{ label: "Hour (UK)" }, { label: "NESO MAE (MW)", numeric: true }, { label: `${adjS} MAE (MW)`, numeric: true }],
       rows: data.byHour.map((r) => [`${String(r.group).padStart(2, "0")}:00`, r.errorMae, r.adjErrorMae ?? null]) },
     hist: { columns: [{ label: "Error from (MW)", numeric: true }, { label: "Error to (MW)", numeric: true }, { label: "Hours", numeric: true }],
       rows: hist.map((b) => [b.from, b.to, b.count]) },
@@ -98,10 +108,14 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
         <div><dt>80% range coverage</dt><dd>{fmtPct(band.coverage)} <span className="kpi-sub">(target 80%)</span></dd></div>
       </dl>
 
+      <Tile className="tile section-gap compare-tile">
+        <ModelComparison cutoff={cutoff} />
+      </Tile>
+
       <div className="three">
         <Tile className="tile">
           <ChartFrame title="Mean error by forecast level · GW"
-            legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast, kind: "bar" }, { label: "Bias-corrected forecast", color: c.adjusted, kind: "bar" }]} />}
+            legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast, kind: "bar" }, { label: adj, color: c.adjusted, kind: "bar" }]} />}
             table={tables.level} fileName="mean-error-by-forecast-level" plotClassName="plot" ariaLabel={`Mean error by forecast level, in GW. ${note}`}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.byLevel} accessibilityLayer barGap={2} margin={{ top: 8, right: 8, bottom: 12, left: 4 }}>
@@ -111,7 +125,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                 <YAxis {...gwAxis(data.byLevel.flatMap((r) => [r.errorBias, r.adjErrorBias]))} {...yAxisProps(c)} />
                 <Customized component={plotFrame(c)} />
                 <ReferenceLine y={0} stroke={c.axis} />
-                <Tooltip cursor={{ fill: c.grid }} content={<GroupTooltip c={c} metric="Bias" />} />
+                <Tooltip cursor={{ fill: c.grid }} content={<GroupTooltip c={c} metric="Bias" adjS={adjS} />} />
                 <Bar dataKey="errorBias" fill={c.forecast} isAnimationActive={false} />
                 <Bar dataKey="adjErrorBias" fill={c.adjusted} isAnimationActive={false} />
               </BarChart>
@@ -150,7 +164,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
 
         <Tile className="tile">
           <ChartFrame title="Daily MAE · GW"
-            legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast }, { label: "Bias-corrected forecast", color: c.adjusted }]} />}
+            legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast }, { label: adj, color: c.adjusted }]} />}
             table={tables.dailyMae} fileName="daily-mae" plotClassName="plot" ariaLabel={`Daily MAE of the NESO and bias-corrected forecasts, in GW. ${note}`}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={daily} accessibilityLayer margin={{ top: 8, right: 12, bottom: 0, left: 4 }}>
@@ -162,7 +176,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                   active && payload?.length ? (
                     <ChartTooltip title={payload[0].payload.label} rows={[
                       { label: "NESO MAE", value: fmtMW(payload[0].payload.maeRaw), color: c.forecast },
-                      { label: "Bias-corrected MAE", value: fmtMW(payload[0].payload.maeAdjusted), color: c.adjusted },
+                      { label: `${adjS} MAE`, value: fmtMW(payload[0].payload.maeAdjusted), color: c.adjusted },
                     ]} />
                   ) : null} />
                 <Line dataKey="maeRaw" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false} />
@@ -193,7 +207,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
               </ResponsiveContainer>
             </ChartFrame>
             <ChartFrame title="MAE by hour of day · GW"
-              legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast }, { label: "Bias-corrected forecast", color: c.adjusted }]} />}
+              legend={<ChartLegend items={[{ label: "NESO forecast", color: c.forecast }, { label: adj, color: c.adjusted }]} />}
               table={tables.hour} fileName="mae-by-hour" plotClassName="diag-plot" ariaLabel={`MAE by hour of day, in GW. ${note}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.byHour} accessibilityLayer margin={{ top: 8, right: 16, bottom: 0, left: 4 }}>
@@ -201,7 +215,7 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
                   <XAxis dataKey="group" tickFormatter={(h) => `${String(h).padStart(2, "0")}:00`} interval="equidistantPreserveStart" minTickGap={6} {...ax} />
                   <YAxis {...gwAxis(data.byHour.flatMap((r) => [r.errorMae, r.adjErrorMae]))} {...yAxisProps(c)} />
                   <Customized component={plotFrame(c)} />
-                  <Tooltip content={<GroupTooltip c={c} metric="MAE" hour />} />
+                  <Tooltip content={<GroupTooltip c={c} metric="MAE" hour adjS={adjS} />} />
                   <Line dataKey="errorMae" stroke={c.forecast} strokeWidth={1.5} dot={false} isAnimationActive={false} />
                   <Line dataKey="adjErrorMae" stroke={c.adjusted} strokeWidth={1.5} dot={false} isAnimationActive={false} />
                 </LineChart>
@@ -241,13 +255,17 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
             <dt>MAE</dt>
             <dd>Mean absolute error, the average size of the hourly error in MW. The % change compares the bias-corrected forecast with the NESO forecast.</dd>
             <dt>Bias-corrected forecast</dt>
-            <dd>NESO forecast scaled by the previous 7 days’ outturn-to-forecast ratio. Only outturn known at decision time is used. Its daily MAE was lower on {cmp.daysAdjustedBetter} of {cmp.days} days.</dd>
+            <dd>NESO forecast scaled by the previous 7 days’ outturn-to-forecast ratio. Only outturn known at decision time is used.{model === "simple" ? ` Its daily MAE was lower on ${cmp.daysAdjustedBetter} of ${cmp.days} days.` : ""}</dd>
+            <dt>ML model (LightGBM + CQR)</dt>
+            <dd>An optional second model, trained monthly on earlier data only and recalibrated on its own errors over the previous 28 days. Its P50 is the ML forecast.{model === "ml" ? ` Its daily MAE was lower than the NESO forecast’s on ${cmp.daysAdjustedBetter} of ${cmp.days} days.` : ""} Evidence and limits are in docs/cqr-2024.md and docs/decisions.md.</dd>
             <dt>Hit rate</dt>
             <dd>Share of hours with outturn at or above the planning volume. Backtest from Nov 2025 to Sep 2026, 7,775 hours. Past performance, not a guarantee.</dd>
             <dt>Under-coverage</dt>
-            <dd>P90 missed 16% of hours (target 10%). P95 missed 11% (target 5%). Whole-day shortfalls happen more often than the previous week suggests.</dd>
+            <dd>P90 missed {missed(90)} of hours (target 10%). P95 missed {missed(95)} (target 5%).{model === "simple" ? " Whole-day shortfalls happen more often than the previous week suggests." : ""}</dd>
             <dt>80% range</dt>
-            <dd>Bias-corrected forecast plus the 10th to 90th percentile of the previous 7 days’ errors. Coverage counts {band.n} hours.</dd>
+            <dd>{model === "ml"
+              ? "The ML model’s 10th to 90th percentile, widened or narrowed by its errors over the previous 28 days."
+              : "Bias-corrected forecast plus the 10th to 90th percentile of the previous 7 days’ errors."} Coverage counts {band.n} hours.</dd>
             <dt>Forecast level</dt>
             <dd>Hours grouped by the NESO forecast at decision time. Bins are below 5, 5 to 10, 10 to 15 and above 15 GW.</dd>
             <dt>Lead time</dt>
@@ -264,15 +282,15 @@ export default function AccuracyView({ cutoff }: { cutoff: string }) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function GroupTooltip({ active, payload, metric, rawOnly, hour, c }: any & { c: ChartColors }) {
+function GroupTooltip({ active, payload, metric, rawOnly, hour, c, adjS }: any & { c: ChartColors }) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   const title = hour ? `${String(p.group).padStart(2, "0")}:00 UK` : p.group;
   const rows = rawOnly
     ? [{ label: "MAE", value: fmtMW(p.errorMae), color: c.forecast }, { label: "Mean error", value: fmtSignedMW(p.errorBias), color: c.forecast }]
     : metric === "Bias"
-      ? [{ label: "NESO mean error", value: fmtSignedMW(p.errorBias), color: c.forecast }, { label: "Bias-corrected mean error", value: fmtSignedMW(p.adjErrorBias), color: c.adjusted }]
-      : [{ label: "NESO MAE", value: fmtMW(p.errorMae), color: c.forecast }, { label: "Bias-corrected MAE", value: fmtMW(p.adjErrorMae), color: c.adjusted }];
+      ? [{ label: "NESO mean error", value: fmtSignedMW(p.errorBias), color: c.forecast }, { label: `${adjS} mean error`, value: fmtSignedMW(p.adjErrorBias), color: c.adjusted }]
+      : [{ label: "NESO MAE", value: fmtMW(p.errorMae), color: c.forecast }, { label: `${adjS} MAE`, value: fmtMW(p.adjErrorMae), color: c.adjusted }];
   return <ChartTooltip title={title} rows={[...rows, { label: "Hours", value: p.n }]} />;
 }
 

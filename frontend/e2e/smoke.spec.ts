@@ -150,3 +150,37 @@ test("with the cost block collapsed the drift chart gets its height back", async
   const height = (await page.locator(".drift-plot").boundingBox())!.height;
   expect(height).toBeGreaterThanOrEqual(250);
 });
+
+test("the model switch serves ML on both views, keeps it in the URL, and disables unsupported combinations", async ({ page }) => {
+  await page.goto("/?date=2026-01-17&cutoff=09:20");
+  await expect(page.locator("#model")).toContainText("Simple");                      // Simple is the default
+  await page.locator("#model").click();
+  await page.getByRole("option", { name: "ML (LightGBM + CQR)" }).click();
+  await expect(page).toHaveURL(/model=ml/);
+  await expect(page.getByRole("region", { name: "Plan" })).toContainText("ML forecast (P50)");
+  await expect(page.locator(".hero")).toContainText("153");
+  // With ML selected, decision times it wasn't precomputed for are disabled.
+  await page.locator("#cutoff").click();
+  await expect(page.getByRole("option", { name: "08:00" })).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByRole("option", { name: "09:00" })).not.toHaveAttribute("aria-disabled", "true");
+  await page.keyboard.press("Escape");
+  expect(await seriousViolations(page)).toEqual([]);
+
+  await page.getByRole("link", { name: "Accuracy" }).click();
+  const compare = page.getByRole("region", { name: "Simple vs ML" });
+  const row = (label: string) => compare.locator("tbody tr", { hasText: label });
+  await expect(row("MAE")).toContainText("1,383 MW");
+  await expect(row("MAE")).toContainText("1,318 MW");
+  await expect(row("80% range coverage")).toContainText("69%");
+  await expect(row("80% range coverage")).toContainText("77%");
+  await expect(row("Cost of the P80 plan")).toContainText("£53.1m");
+  expect(await seriousViolations(page)).toEqual([]);
+});
+
+test("an ML link at a decision time ML doesn't cover opens on Simple", async ({ page }) => {
+  await page.goto("/?date=2026-01-17&cutoff=08:00&model=ml");
+  await expect(page.locator("#model")).toContainText("Simple");
+  await expect(page).toHaveURL(/model=simple/);
+  await page.locator("#model").click();
+  await expect(page.getByRole("option", { name: "ML (LightGBM + CQR)" })).toHaveAttribute("aria-disabled", "true");
+});

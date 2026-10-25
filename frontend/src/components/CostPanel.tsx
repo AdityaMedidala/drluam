@@ -5,14 +5,15 @@ import {
 import { Checkmark } from "@carbon/icons-react";
 import { useEffect, useState } from "react";
 import { api, type CostResponse, type CostRow } from "../api";
+import { adjustedName, useModel, type Model } from "../model";
 import { ErrorState, Loading } from "./ui";
 
 export const DEFAULT_COSTS = { short: 100, long: 30 };   // GBP/MWh, illustrative desk assumptions
 export const MAX_COST = 10_000;
 export const validCost = (n: number) => Number.isFinite(n) && n > 0 && n <= MAX_COST;
 
-const rowLabel = (r: CostRow) =>
-  r.confidence ? `P${r.confidence}` : r.key === "forecast" ? "NESO forecast" : "Bias-corrected forecast";
+const rowLabel = (r: CostRow, model: Model) =>
+  r.confidence ? `P${r.confidence}` : r.key === "forecast" ? "NESO forecast" : adjustedName(model);
 const gbpM = (v: number) => (v / 1e6).toLocaleString("en-GB", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const signedGbpM = (v: number) => (Math.abs(v) < 5e4 ? "0.0" : `${v < 0 ? "−" : "+"}${gbpM(Math.abs(v))}`);
 
@@ -35,15 +36,16 @@ export default function CostPanel({ cutoff, short, long, confidence, onCosts, on
   cutoff: string; short: number; long: number; confidence: number;
   onCosts: (short: number, long: number) => void; onUseLevel: (level: number) => void;
 }) {
+  const model = useModel();
   const [data, setData] = useState<CostResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
     setError(null);
-    api.cost(cutoff, short, long).then((d) => live && setData(d)).catch((e) => live && setError(String(e)));
+    api.cost(cutoff, short, long, model).then((d) => live && setData(d)).catch((e) => live && setError(String(e)));
     return () => { live = false; };
-  }, [cutoff, short, long]);
+  }, [cutoff, short, long, model]);
 
   const rec = data?.recommended;
   const bt = data?.backtest;
@@ -127,7 +129,7 @@ export default function CostPanel({ cutoff, short, long, confidence, onCosts, on
                 <TableBody>
                   {bt.rows.map((r) => (
                     <TableRow key={r.key} className={r.key === bt.lowest ? "lowest" : undefined}>
-                      <TableCell>{rowLabel(r)}{r.key === bt.lowest && <span className="cds--visually-hidden"> (lowest cost)</span>}</TableCell>
+                      <TableCell>{rowLabel(r, model)}{r.key === bt.lowest && <span className="cds--visually-hidden"> (lowest cost)</span>}</TableCell>
                       <TableCell>{gbpM(r.costGBP)}</TableCell>
                       <TableCell>{r.key === "forecast" ? "–" : signedGbpM(r.vsNesoGBP)}</TableCell>
                     </TableRow>
