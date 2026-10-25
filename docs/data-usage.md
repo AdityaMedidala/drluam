@@ -14,4 +14,8 @@ Which periods have been used for what, so that no "confirmation" is run on data 
 | 2024 (delivery days) | One confirmation run of LightGBM + CQR (`cqr-2024.md`), 25 Oct 2026: confirmed out-of-period | **Used. No longer a holdout.** |
 | 15–31 Oct 2025 | Warm-up history for November 2025 ratios in `validation.md` (never scored), later part of the vault | Used |
 
-**Any future change to the correction or the uncertainty band must be pre-registered and confirmed on data from November 2026 onwards.** None of the periods above can serve as a confirmation any more. Candidates already waiting for that test: the 14-day band residual window (`validation.md` addendum).
+**Any future change to the correction or the uncertainty band must be pre-registered and confirmed on data from November 2026 onwards.** None of the periods above can serve as a confirmation any more. Candidates waiting for that test:
+- the 14-day band residual window (`validation.md` addendum);
+- LightGBM + CQR as the default.
+
+**One documented exception** (`decisions.md`, ADR-001). LightGBM + CQR was added to the app as an optional, non-default model on the strength of the 2024 out-of-period confirmation. That decision deviates from this rule on purpose: the rule predates the 2024 data being available. It is not a new confirmation and consumed no data.

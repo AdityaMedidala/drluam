@@ -17,4 +17,7 @@ Every study beyond the app's core numbers, in order. "Rule first" means the deci
 | 25 Oct 2026 | Conformalized quantile regression (CQR) on the challenger | yes (`6608a98`), exploratory | Nov 2025 – Sep 2026 (seen before) | promising, unconfirmed (8 of 11 months in band) | `cqr.md` |
 | 25 Oct 2026 | CQR out-of-period confirmation | yes (`a6d8e6e`), before fetching | 2024, once (trained from 2023) | **confirmed out-of-period** (coverage 80.0%, pinball −55 MW [−81, −31]) | `cqr-2024.md` |
 
-**Where this leaves the app.** The app still uses the 7-day ratio correction and the 7-day residual band. LightGBM + CQR is the strongest candidate so far: confirmed on one unseen year, and promising on the development months. The project's rule is that a method change needs a pre-registered trial on Nov 2026+ data first.
+**Where this leaves the app.**
+- The default model is unchanged: the 7-day ratio correction and the 7-day residual band.
+- LightGBM + CQR, confirmed on one unseen year and promising on the development months, is now an optional "ML" model in the app (`decisions.md`, ADR-001). This was an owner decision that deviates from the data-usage rule on purpose.
+- Making it the default would still need a pre-registered trial on Nov 2026+ data.
