@@ -12,6 +12,7 @@ A web app for a UK utility's day-ahead power buying team. It answers two questio
 On an unseen year, 2024, ML's 80% range covered 80.0% of hours, and its pinball loss was 55 MW lower than Simple's [−81, −31]. Why it is optional and not the default: [ADR-001](docs/decisions.md).
 
 **Live app:** https://drluam.vercel.app
+**Pilot brief for the client (2 pages):** [docs/pilot-brief.pdf](docs/pilot-brief.pdf) ([Markdown source](docs/pilot-brief.md))
 **Video walkthrough:** _<add unlisted YouTube URL>_
 
 ---
