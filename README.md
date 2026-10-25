@@ -1,5 +1,7 @@
 # Wind Forecast Desk
 
+[![CI](https://github.com/AdityaMedidala/drluam/actions/workflows/ci.yml/badge.svg)](https://github.com/AdityaMedidala/drluam/actions/workflows/ci.yml)
+
 A web app for a UK utility's day-ahead power buying team. It answers two questions:
 
 1. **What was the latest wind forecast available when we had to decide?** For each delivery day, it shows the forecast the desk could actually see before the day-ahead auction closed. It also shows an adjusted forecast and an uncertainty band.
